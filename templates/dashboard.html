@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SHEild — Emergency Dashboard</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background:#0f0f10; color:#fff; min-height:100vh; padding:24px; }
+ 
+    .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+    .logo { font-size:22px; font-weight:600; letter-spacing:-0.5px; }
+    .logo span { color:#ff3b30; }
+    .status-badge { background:#ff3b30; color:#fff; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:500; animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+ 
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; margin-bottom:24px; }
+ 
+    .card { background:#1c1c1e; border:1px solid #2c2c2e; border-radius:16px; padding:20px; }
+    .card-label { font-size:12px; color:#888; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px; }
+    .card-value { font-size:28px; font-weight:300; color:#fff; }
+    .card-sub   { font-size:13px; color:#888; margin-top:4px; }
+ 
+    .alert-card { background:#1c1c1e; border:1px solid #ff3b3044; border-radius:16px; padding:20px; margin-bottom:16px; }
+    .alert-time { font-size:12px; color:#888; margin-bottom:6px; }
+    .alert-location { font-size:15px; color:#fff; margin-bottom:10px; }
+    .alert-link { display:inline-block; background:#ff3b30; color:#fff; padding:8px 18px; border-radius:10px; font-size:13px; text-decoration:none; font-weight:500; }
+    .alert-link:hover { background:#e0332a; }
+ 
+    .map-container { background:#1c1c1e; border:1px solid #2c2c2e; border-radius:16px; overflow:hidden; margin-bottom:24px; }
+    .map-header { padding:16px 20px; border-bottom:1px solid #2c2c2e; display:flex; align-items:center; gap:8px; }
+    .map-dot { width:8px; height:8px; border-radius:50%; background:#ff3b30; animation:pulse 1.5s infinite; }
+    .map-title { font-size:14px; font-weight:500; }
+    #map { height:320px; width:100%; }
+ 
+    .no-alerts { text-align:center; padding:48px; color:#555; }
+    .no-alerts p { font-size:15px; margin-top:8px; }
+ 
+    .status-row { display:flex; align-items:center; gap:8px; margin-top:8px; }
+    .dot-green { width:8px; height:8px; border-radius:50%; background:#30d158; flex-shrink:0; }
+    .dot-red   { width:8px; height:8px; border-radius:50%; background:#ff3b30; flex-shrink:0; animation:pulse 1.5s infinite; }
+  </style>
+</head>
+<body>
+ 
+<div class="header">
+  <div class="logo">SHE<span>ild</span> Dashboard</div>
+  {% if alerts %}
+    <div class="status-badge">🚨 {{ alerts|length }} ALERT{{ 's' if alerts|length > 1 else '' }}</div>
+  {% else %}
+    <div style="background:#1c1c1e;border:1px solid #2c2c2e;color:#888;padding:6px 16px;border-radius:20px;font-size:13px;">All safe</div>
+  {% endif %}
+</div>
+ 
+<!-- Summary cards -->
+<div class="grid">
+  <div class="card">
+    <div class="card-label">Total alerts today</div>
+    <div class="card-value">{{ alerts|length }}</div>
+    <div class="card-sub">Since monitoring started</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Last alert</div>
+    <div class="card-value" style="font-size:18px;margin-top:4px">
+      {% if alerts %}{{ alerts[-1].time[:19].replace('T',' ') }}{% else %}None{% endif %}
+    </div>
+    <div class="card-sub">UTC timestamp</div>
+  </div>
+  <div class="card">
+    <div class="card-label">System status</div>
+    <div style="margin-top:8px">
+      <div class="status-row"><div class="dot-green"></div><span style="font-size:13px;color:#888">App running</span></div>
+      <div class="status-row"><div class="dot-green"></div><span style="font-size:13px;color:#888">Email alerts active</span></div>
+      <div class="status-row">
+        <div class="{{ 'dot-red' if alerts else 'dot-green' }}"></div>
+        <span style="font-size:13px;color:#888">{{ 'SOS in log' if alerts else 'No active SOS' }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+ 
+<!-- Live map -->
+<div class="map-container">
+  <div class="map-header">
+    <div class="map-dot"></div>
+    <div class="map-title">Live location tracking</div>
+  </div>
+  {% if alerts and alerts[-1].lat %}
+    <div id="map"></div>
+  {% else %}
+    <div style="height:200px;display:flex;align-items:center;justify-content:center;color:#555;font-size:14px;">
+      No GPS data yet — waiting for SOS signal
+    </div>
+  {% endif %}
+</div>
+ 
+<!-- Alert log -->
+<div class="card">
+  <div class="card-label" style="margin-bottom:16px">Alert log</div>
+ 
+  {% if alerts %}
+    {% for alert in alerts|reverse %}
+    <div class="alert-card">
+      <div class="alert-time">Alert #{{ loop.revindex }} — {{ alert.time[:19].replace('T',' ') }} UTC</div>
+      <div class="alert-location">
+        {% if alert.lat %}
+          📍 {{ "%.4f"|format(alert.lat) }}, {{ "%.4f"|format(alert.lng) }}
+        {% else %}
+          📍 GPS unavailable — SMS fallback used
+        {% endif %}
+      </div>
+      {% if alert.maps != 'GPS unavailable' %}
+        <a href="{{ alert.maps }}" target="_blank" class="alert-link">Open in Google Maps</a>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="no-alerts">
+      <div style="font-size:32px">🛡</div>
+      <p>No alerts triggered yet. System is active and monitoring.</p>
+    </div>
+  {% endif %}
+</div>
+ 
+<!-- Auto-refresh every 10 seconds -->
+<script>
+  setTimeout(() => location.reload(), 10000);
+</script>
+ 
+{% if alerts and alerts[-1].lat %}
+<script>
+  function initMap() {
+    const lat = {{ alerts[-1].lat }};
+    const lng = {{ alerts[-1].lng }};
+    const pos = { lat, lng };
+    const map = new google.maps.Map(document.getElementById('map'), {
+      zoom: 15,
+      center: pos,
+      styles: [
+        { elementType:'geometry', stylers:[{color:'#1a1a2e'}] },
+        { elementType:'labels.text.fill', stylers:[{color:'#746855'}] },
+        { featureType:'road', elementType:'geometry', stylers:[{color:'#2a2a3e'}] },
+        { featureType:'water', stylers:[{color:'#0d1b2a'}] }
+      ]
+    });
+    new google.maps.Marker({
+      position: pos,
+      map,
+      title: 'SOS Location',
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 14, fillColor:'#ff3b30', fillOpacity:1, strokeColor:'#fff', strokeWeight:3 }
+    });
+    new google.maps.Circle({
+      strokeColor:'#ff3b30', strokeOpacity:0.4, strokeWeight:1,
+      fillColor:'#ff3b30', fillOpacity:0.1,
+      map, center:pos, radius:200
+    });
+  }
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAP7__5xM64YmapiegQM6On7-rolHXr2Uo" async defer></script>
+{% endif %}
+ 
+</body>
+</html>

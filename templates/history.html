@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SHEild — SOS History</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#0f0f10; color:#fff; font-family:-apple-system,BlinkMacSystemFont,sans-serif; min-height:100vh; padding:24px; }
+
+    .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; flex-wrap:wrap; gap:12px; }
+    .logo { font-size:20px; font-weight:600; letter-spacing:-0.5px; }
+    .logo span { color:#ff3b30; }
+    .back-btn { background:#1c1c1e; border:1px solid #2c2c2e; color:#aaa; padding:8px 16px; border-radius:20px; font-size:13px; text-decoration:none; }
+    .back-btn:hover { border-color:#555; color:#fff; }
+
+    .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:24px; }
+    .stat-card { background:#1c1c1e; border:1px solid #2c2c2e; border-radius:12px; padding:14px 16px; }
+    .stat-label { font-size:11px; color:#666; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px; }
+    .stat-value { font-size:24px; font-weight:300; color:#fff; }
+
+    .section-title { font-size:12px; color:#666; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:14px; }
+
+    .alert-card {
+      background:#1c1c1e; border:1px solid #2c2c2e;
+      border-radius:16px; padding:20px; margin-bottom:14px;
+      transition:border-color 0.2s;
+    }
+    .alert-card:hover { border-color:#3a3a3c; }
+    .alert-card.has-audio { border-left:3px solid #30d158; }
+
+    .alert-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; gap:12px; flex-wrap:wrap; }
+    .alert-number { font-size:11px; color:#666; margin-bottom:4px; }
+    .alert-time   { font-size:15px; font-weight:500; color:#fff; }
+    .alert-id     { font-size:11px; color:#555; margin-top:2px; font-family:monospace; }
+
+    .alert-badges { display:flex; gap:6px; flex-wrap:wrap; }
+    .badge { font-size:11px; padding:3px 10px; border-radius:20px; font-weight:500; }
+    .badge-gps   { background:#1a2e1a; color:#30d158; border:1px solid #30d15833; }
+    .badge-nogps { background:#2a1a1a; color:#ff6b60; border:1px solid #ff3b3033; }
+    .badge-audio { background:#1a2030; color:#5ac8fa; border:1px solid #5ac8fa33; }
+
+    .alert-location { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+    .location-text  { font-size:13px; color:#aaa; }
+    .maps-btn {
+      background:#ff3b30; color:#fff; padding:6px 14px;
+      border-radius:8px; font-size:12px; text-decoration:none;
+      font-weight:500; white-space:nowrap;
+    }
+    .maps-btn:hover { background:#e0332a; }
+
+    .audio-section { margin-top:14px; padding-top:14px; border-top:1px solid #2c2c2e; }
+    .audio-label { font-size:12px; color:#666; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+    audio {
+      width:100%; height:36px;
+      background:#2c2c2e; border-radius:8px;
+      outline:none;
+    }
+    audio::-webkit-media-controls-panel { background:#2c2c2e; }
+
+    .no-audio { font-size:12px; color:#444; font-style:italic; margin-top:10px; }
+
+    .empty-state { text-align:center; padding:60px 20px; color:#444; }
+    .empty-icon  { font-size:48px; margin-bottom:16px; }
+    .empty-text  { font-size:15px; }
+
+    .clear-btn {
+      background:#2a1010; border:1px solid #ff3b3033; color:#ff6b60;
+      padding:8px 16px; border-radius:20px; font-size:13px;
+      cursor:pointer; float:right;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">SHE<span>ild</span> — SOS History</div>
+  <a href="/dashboard" class="back-btn">← Dashboard</a>
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">Total alerts</div>
+    <div class="stat-value" id="total-count">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">With GPS</div>
+    <div class="stat-value" id="gps-count">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Audio saved</div>
+    <div class="stat-value" id="audio-count">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Last alert</div>
+    <div class="stat-value" style="font-size:14px;margin-top:4px" id="last-alert">—</div>
+  </div>
+</div>
+
+<!-- Alert list -->
+<div class="section-title">All alerts — newest first</div>
+<div id="alerts-container">
+  <div class="empty-state">
+    <div class="empty-icon">📋</div>
+    <div class="empty-text">Loading alert history...</div>
+  </div>
+</div>
+
+<script>
+  function formatTime(iso) {
+    if (!iso) return '—';
+    return iso.replace('T', ' ').substring(0, 19) + ' UTC';
+  }
+
+  function loadHistory() {
+    fetch('/alerts')
+      .then(r => r.json())
+      .then(function(alerts) {
+        const container   = document.getElementById('alerts-container');
+        const total       = alerts.length;
+        const withGPS     = alerts.filter(a => a.lat).length;
+        const withAudio   = alerts.filter(a => a.audio).length;
+
+        document.getElementById('total-count').textContent = total;
+        document.getElementById('gps-count').textContent   = withGPS;
+        document.getElementById('audio-count').textContent = withAudio;
+        document.getElementById('last-alert').textContent  =
+          total > 0 ? alerts[total-1].time.substring(0,10) : '—';
+
+        if (total === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">🛡</div>
+              <div class="empty-text">No SOS alerts triggered yet. System is active.</div>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = '';
+        const reversed = [...alerts].reverse();
+
+        reversed.forEach(function(alert, i) {
+          const hasGPS   = alert.lat && alert.lng;
+          const hasAudio = alert.audio;
+          const alertNum = total - i;
+
+          const card = document.createElement('div');
+          card.className = 'alert-card' + (hasAudio ? ' has-audio' : '');
+
+          const audioSection = hasAudio
+            ? `<div class="audio-section">
+                <div class="audio-label">🎙 Audio evidence recording</div>
+                <audio controls>
+                  <source src="/evidence/${alert.id}.webm" type="audio/webm">
+                  <source src="/evidence/${alert.id}.webm" type="audio/ogg">
+                  Your browser does not support audio playback.
+                </audio>
+               </div>`
+            : `<div class="no-audio">No audio recorded for this alert</div>`;
+
+          const coordText = hasGPS
+            ? parseFloat(alert.lat).toFixed(5) + ', ' + parseFloat(alert.lng).toFixed(5)
+            : 'GPS unavailable — SMS fallback used';
+
+          const mapsBtn = (hasGPS && alert.maps !== 'GPS unavailable')
+            ? `<a href="${alert.maps}" target="_blank" class="maps-btn">Open Maps ↗</a>`
+            : '';
+
+          card.innerHTML = `
+            <div class="alert-header">
+              <div>
+                <div class="alert-number">Alert #${alertNum}</div>
+                <div class="alert-time">${formatTime(alert.time)}</div>
+                <div class="alert-id">${alert.id}</div>
+              </div>
+              <div class="alert-badges">
+                <span class="badge ${hasGPS ? 'badge-gps' : 'badge-nogps'}">
+                  ${hasGPS ? '📍 GPS' : '📍 No GPS'}
+                </span>
+                ${hasAudio ? '<span class="badge badge-audio">🎙 Audio</span>' : ''}
+              </div>
+            </div>
+            <div class="alert-location">
+              <span class="location-text">${coordText}</span>
+              ${mapsBtn}
+            </div>
+            ${audioSection}
+          `;
+
+          container.appendChild(card);
+        });
+      })
+      .catch(function() {
+        document.getElementById('alerts-container').innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">⚠</div>
+            <div class="empty-text">Could not load history. Make sure Flask is running.</div>
+          </div>`;
+      });
+  }
+
+  loadHistory();
+  // Refresh every 15 seconds
+  setInterval(loadHistory, 15000);
+</script>
+</body>
+</html>

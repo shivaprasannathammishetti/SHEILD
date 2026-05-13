@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SHEild — Setup</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f0f10;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .container { width:100%; max-width:440px; }
+
+    .logo {
+      font-size: 32px;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 6px;
+      letter-spacing: -1px;
+    }
+    .logo span { color: #ff3b30; }
+
+    .tagline {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+
+    .step {
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 14px;
+    }
+
+    .step-num {
+      font-size: 11px;
+      color: #ff3b30;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    .step-title {
+      font-size: 17px;
+      font-weight: 500;
+      margin-bottom: 18px;
+      color: #fff;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 6px;
+      margin-top: 10px;
+    }
+
+    label:first-of-type { margin-top: 0; }
+
+    input[type=text],
+    input[type=email],
+    input[type=password],
+    input[type=tel],
+    select {
+      width: 100%;
+      background: #2c2c2e;
+      border: 1px solid #3a3a3c;
+      border-radius: 12px;
+      color: #fff;
+      padding: 13px 14px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus { border-color: #ff3b30; }
+    select option { background: #2c2c2e; }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .gesture-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 0;
+    }
+
+    .gesture-btn {
+      background: #2c2c2e;
+      border: 1px solid #3a3a3c;
+      border-radius: 12px;
+      color: #888;
+      padding: 12px 8px;
+      font-size: 13px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+      line-height: 1.4;
+    }
+
+    .gesture-btn .icon { font-size: 20px; display: block; margin-bottom: 4px; }
+    .gesture-btn.active { background: #2a1010; border-color: #ff3b30; color: #ff3b30; }
+    .gesture-btn:hover  { border-color: #555; color: #ccc; }
+
+    .pin-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 4px;
+    }
+
+    .pin-digit {
+      width: 56px;
+      height: 56px;
+      background: #2c2c2e;
+      border: 1px solid #3a3a3c;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 24px;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .pin-digit:focus { border-color: #ff3b30; }
+
+    .time-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .time-divider { color: #666; font-size: 18px; text-align: center; }
+
+    .save-btn {
+      width: 100%;
+      background: #ff3b30;
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      padding: 17px;
+      font-size: 17px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.15s, transform 0.1s;
+      letter-spacing: -0.3px;
+    }
+
+    .save-btn:hover  { background: #e0332a; }
+    .save-btn:active { transform: scale(0.98); }
+    .save-btn:disabled { background: #555; cursor: not-allowed; }
+
+    .error-msg {
+      display: none;
+      background: #2a1010;
+      border: 1px solid #ff3b3055;
+      color: #ff6b60;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .success {
+      display: none;
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .success-icon { font-size: 56px; margin-bottom: 20px; }
+
+    .success h2 {
+      font-size: 24px;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+
+    .success p {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 8px;
+      line-height: 1.6;
+    }
+
+    .success-details {
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      border-radius: 14px;
+      padding: 16px;
+      margin: 20px 0;
+      text-align: left;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      padding: 6px 0;
+      border-bottom: 1px solid #2c2c2e;
+    }
+
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: #666; }
+    .detail-value { color: #fff; font-weight: 500; }
+
+    .go-btn {
+      display: inline-block;
+      background: #ff3b30;
+      color: #fff;
+      padding: 14px 40px;
+      border-radius: 14px;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 500;
+      margin-top: 8px;
+      transition: background 0.15s;
+    }
+
+    .go-btn:hover { background: #e0332a; }
+
+    .hint {
+      font-size: 11px;
+      color: #555;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    .spinner {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #fff4;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="logo">SHE<span>ild</span></div>
+  <p class="tagline">Set up your silent safety system</p>
+
+  <!-- Form section -->
+  <div id="form-section">
+
+    <div class="error-msg" id="error-msg"></div>
+
+    <!-- Step 1: Trusted contacts -->
+    <div class="step">
+      <div class="step-num">STEP 1 OF 4</div>
+      <div class="step-title">Your trusted contacts</div>
+
+      <label>Contact 1 — Name</label>
+      <input type="text" id="c1name" placeholder="e.g. Mom" autocomplete="off"/>
+
+      <label>Contact 1 — Email</label>
+      <input type="email" id="c1email" placeholder="mom@gmail.com" autocomplete="off"/>
+
+      <label>Contact 1 — Phone (for SMS)</label>
+      <input type="tel" id="c1phone" placeholder="9876543210"/>
+
+      <div style="height:12px"></div>
+
+      <label>Contact 2 — Name (optional)</label>
+      <input type="text" id="c2name" placeholder="e.g. Best friend" autocomplete="off"/>
+
+      <label>Contact 2 — Email (optional)</label>
+      <input type="email" id="c2email" placeholder="friend@gmail.com" autocomplete="off"/>
+
+      <label>Contact 2 — Phone (optional)</label>
+      <input type="tel" id="c2phone" placeholder="9876543210"/>
+    </div>
+
+    <!-- Step 2: Gesture -->
+    <div class="step">
+      <div class="step-num">STEP 2 OF 4</div>
+      <div class="step-title">Choose your hidden SOS trigger</div>
+
+      <div class="gesture-grid">
+        <div class="gesture-btn active" onclick="selectGesture(this,'key_s')" id="g-key_s">
+          <span class="icon">⌨️</span>Press S × 3
+        </div>
+        <div class="gesture-btn" onclick="selectGesture(this,'corner_tap')" id="g-corner_tap">
+          <span class="icon">👆</span>Corner tap × 3
+        </div>
+        <div class="gesture-btn" onclick="selectGesture(this,'voice')" id="g-voice">
+          <span class="icon">🎙</span>Secret keyword
+        </div>
+        <div class="gesture-btn" onclick="selectGesture(this,'volume')" id="g-volume">
+          <span class="icon">🔊</span>Volume × 3
+        </div>
+      </div>
+      <input type="hidden" id="gesture" value="key_s"/>
+      <p class="hint" style="margin-top:10px">All triggers activate SOS silently — no screen change visible to others</p>
+    </div>
+
+    <!-- Step 3: Cancel PIN -->
+    <div class="step">
+      <div class="step-num">STEP 3 OF 4</div>
+      <div class="step-title">Set your secret cancel PIN</div>
+      <p class="hint" style="margin-bottom:14px">This 4-digit PIN cancels a false trigger during the 10-second window. Only you should know this.</p>
+
+      <label>Enter PIN</label>
+      <div class="pin-row">
+        <input class="pin-digit" type="password" maxlength="1" id="p1" oninput="pinNext(this,'p2')"/>
+        <input class="pin-digit" type="password" maxlength="1" id="p2" oninput="pinNext(this,'p3')"/>
+        <input class="pin-digit" type="password" maxlength="1" id="p3" oninput="pinNext(this,'p4')"/>
+        <input class="pin-digit" type="password" maxlength="1" id="p4" oninput="pinNext(this,null)"/>
+      </div>
+
+      <label style="margin-top:16px">Confirm PIN</label>
+      <div class="pin-row">
+        <input class="pin-digit" type="password" maxlength="1" id="c1" oninput="pinNext(this,'c2')"/>
+        <input class="pin-digit" type="password" maxlength="1" id="c2" oninput="pinNext(this,'c3')"/>
+        <input class="pin-digit" type="password" maxlength="1" id="c3" oninput="pinNext(this,'c4')"/>
+        <input class="pin-digit" type="password" maxlength="1" id="c4" oninput="pinNext(this,null)"/>
+      </div>
+    </div>
+
+    <!-- Step 4: Active hours -->
+    <div class="step">
+      <div class="step-num">STEP 4 OF 4</div>
+      <div class="step-title">Active hours</div>
+      <p class="hint" style="margin-bottom:14px">SOS trigger is always on. Outside these hours an extra confirmation step is required to prevent accidental triggers.</p>
+
+      <div class="time-row">
+        <div>
+          <label>From</label>
+          <select id="from-hour">
+            <option value="17">5:00 PM</option>
+            <option value="18">6:00 PM</option>
+            <option value="19">7:00 PM</option>
+            <option value="20" selected>8:00 PM</option>
+            <option value="21">9:00 PM</option>
+            <option value="22">10:00 PM</option>
+          </select>
+        </div>
+        <div class="time-divider">→</div>
+        <div>
+          <label>To</label>
+          <select id="to-hour">
+            <option value="4">4:00 AM</option>
+            <option value="5">5:00 AM</option>
+            <option value="6" selected>6:00 AM</option>
+            <option value="7">7:00 AM</option>
+            <option value="8">8:00 AM</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <button class="save-btn" onclick="saveSetup()" id="save-btn">
+      <span id="btn-text">Save and activate SHEild</span>
+      <div class="spinner" id="spinner"></div>
+    </button>
+
+  </div>
+
+  <!-- Success screen -->
+  <div class="success" id="success-section">
+    <div class="success-icon">🛡</div>
+    <h2>SHEild is now active</h2>
+    <p>Your trusted contacts will be alerted instantly if you trigger SOS. The app runs silently disguised as a calculator.</p>
+
+    <div class="success-details" id="success-details"></div>
+
+    <a href="/" class="go-btn">Open the app →</a>
+  </div>
+
+</div>
+
+<script>
+  /* ── Gesture selection ── */
+  function selectGesture(el, val) {
+    document.querySelectorAll('.gesture-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('gesture').value = val;
+  }
+
+  /* ── PIN auto-advance ── */
+  function pinNext(el, nextId) {
+    if (el.value.length === 1 && nextId) {
+      document.getElementById(nextId).focus();
+    }
+  }
+
+  function getPin(prefix) {
+    return ['1','2','3','4'].map(n => document.getElementById(prefix + n).value).join('');
+  }
+
+  /* ── Show error ── */
+  function showError(msg) {
+    const el = document.getElementById('error-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+
+  /* ── Reset save button ── */
+  function resetBtn() {
+    document.getElementById('btn-text').style.display = 'inline';
+    document.getElementById('spinner').style.display  = 'none';
+    document.getElementById('save-btn').disabled      = false;
+  }
+
+  /* ── Save setup ── */
+  function saveSetup() {
+    const c1email = document.getElementById('c1email').value.trim();
+    const c1name  = document.getElementById('c1name').value.trim();
+    const pin     = getPin('p');
+    const pinConf = getPin('c');
+
+    // Validation
+    if (!c1email) { showError('Please enter at least one trusted contact email'); return; }
+    if (!c1email.includes('@')) { showError('Please enter a valid email address'); return; }
+    if (pin.length < 4) { showError('Please enter a complete 4-digit PIN'); return; }
+    if (pin !== pinConf) { showError('PINs do not match — please try again'); return; }
+
+    // Show loading spinner
+    document.getElementById('btn-text').style.display = 'none';
+    document.getElementById('spinner').style.display  = 'block';
+    document.getElementById('save-btn').disabled      = true;
+
+    // Build contacts list
+    const contacts = [
+      {
+        name  : c1name,
+        email : c1email,
+        phone : document.getElementById('c1phone').value.trim()
+      }
+    ];
+
+    const c2email = document.getElementById('c2email').value.trim();
+    if (c2email) {
+      contacts.push({
+        name  : document.getElementById('c2name').value.trim(),
+        email : c2email,
+        phone : document.getElementById('c2phone').value.trim()
+      });
+    }
+
+    const config = {
+      contacts : contacts,
+      gesture  : document.getElementById('gesture').value,
+      pin      : pin,
+      from     : document.getElementById('from-hour').value,
+      to       : document.getElementById('to-hour').value
+    };
+
+    // ── THIS IS THE FIX — correct closing brackets ──
+    fetch('/setup', {
+      method  : 'POST',
+      headers : { 'Content-Type': 'application/json' },
+      body    : JSON.stringify(config)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      // Save to localStorage for SMS and PIN use
+      localStorage.setItem('sheild_config', JSON.stringify(config));
+      localStorage.setItem('sheild_pin', config.pin);
+      showSuccess(config);
+    })
+    .catch(function(err) {
+      console.log('Server error:', err);
+      // Even if server fails, save locally so app still works
+      localStorage.setItem('sheild_config', JSON.stringify(config));
+      localStorage.setItem('sheild_pin', config.pin);
+      showSuccess(config);
+    });
+  }
+
+  /* ── Show success screen ── */
+  function showSuccess(config) {
+    const gestureLabels = {
+      'key_s'      : 'Press S × 3',
+      'corner_tap' : 'Corner tap × 3',
+      'voice'      : 'Secret keyword',
+      'volume'     : 'Volume button × 3'
+    };
+
+    const details = document.getElementById('success-details');
+    details.innerHTML = `
+      <div class="detail-row">
+        <span class="detail-label">Contact 1</span>
+        <span class="detail-value">${config.contacts[0].name || config.contacts[0].email}</span>
+      </div>
+      ${config.contacts[0].phone ? `
+      <div class="detail-row">
+        <span class="detail-label">Phone (SMS)</span>
+        <span class="detail-value">${config.contacts[0].phone}</span>
+      </div>` : ''}
+      ${config.contacts[1] ? `
+      <div class="detail-row">
+        <span class="detail-label">Contact 2</span>
+        <span class="detail-value">${config.contacts[1].name || config.contacts[1].email}</span>
+      </div>` : ''}
+      <div class="detail-row">
+        <span class="detail-label">SOS trigger</span>
+        <span class="detail-value">${gestureLabels[config.gesture] || config.gesture}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Cancel PIN</span>
+        <span class="detail-value">••••</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Active hours</span>
+        <span class="detail-value">${config.from}:00 – ${config.to}:00</span>
+      </div>
+    `;
+
+    document.getElementById('form-section').style.display    = 'none';
+    document.getElementById('success-section').style.display = 'block';
+  }
+
+  /* ── Load existing config on page open ── */
+  window.onload = function() {
+    const saved = localStorage.getItem('sheild_config');
+    if (saved) {
+      try {
+        const c = JSON.parse(saved);
+        if (c.contacts && c.contacts[0]) {
+          document.getElementById('c1name').value  = c.contacts[0].name  || '';
+          document.getElementById('c1email').value = c.contacts[0].email || '';
+          document.getElementById('c1phone').value = c.contacts[0].phone || '';
+        }
+        if (c.contacts && c.contacts[1]) {
+          document.getElementById('c2name').value  = c.contacts[1].name  || '';
+          document.getElementById('c2email').value = c.contacts[1].email || '';
+          document.getElementById('c2phone').value = c.contacts[1].phone || '';
+        }
+        if (c.gesture) {
+          document.querySelectorAll('.gesture-btn').forEach(b => b.classList.remove('active'));
+          const gb = document.getElementById('g-' + c.gesture);
+          if (gb) gb.classList.add('active');
+          document.getElementById('gesture').value = c.gesture;
+        }
+        if (c.from) document.getElementById('from-hour').value = c.from;
+        if (c.to)   document.getElementById('to-hour').value   = c.to;
+      } catch(e) {}
+    }
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SHEild — Safe Route</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      background: #0f0f10;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #0f0f10;
+      border-bottom: 1px solid #1c1c1e;
+      flex-shrink: 0;
+    }
+
+    .logo { font-size: 18px; font-weight: 600; }
+    .logo span { color: #ff3b30; }
+
+    .back-btn {
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      color: #aaa;
+      padding: 8px 14px;
+      border-radius: 20px;
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    .search-panel {
+      padding: 16px 20px;
+      border-bottom: 1px solid #1c1c1e;
+      background: #0f0f10;
+      flex-shrink: 0;
+    }
+
+    .input-group { margin-bottom: 12px; }
+
+    .input-label {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      display: block;
+    }
+
+    .route-input {
+      width: 100%;
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      color: #fff;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .route-input:focus { border-color: #30d158; }
+
+    .location-btn {
+      width: 100%;
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      color: #30d158;
+      padding: 11px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 13px;
+      text-align: left;
+      margin-bottom: 6px;
+    }
+
+    .location-btn:active { opacity: 0.7; }
+
+    .from-status {
+      font-size: 12px;
+      color: #30d158;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .go-btn {
+      width: 100%;
+      background: #30d158;
+      color: #000;
+      border: none;
+      padding: 14px;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 15px;
+      margin-top: 4px;
+    }
+
+    .go-btn:active { opacity: 0.8; }
+
+    #map { flex: 1; min-height: 380px; }
+
+    .info-panel {
+      background: #1c1c1e;
+      border-top: 1px solid #2c2c2e;
+      padding: 16px 20px;
+      flex-shrink: 0;
+      display: none;
+    }
+
+    .info-panel.visible { display: block; }
+
+    .route-stats {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 12px;
+    }
+
+    .stat { text-align: center; }
+    .stat-value { font-size: 20px; font-weight: 300; color: #30d158; }
+    .stat-label { font-size: 11px; color: #666; margin-top: 2px; }
+
+    .safety-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .badge {
+      background: #0f0f10;
+      border: 1px solid #2c2c2e;
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: #888;
+    }
+
+    .badge.green { border-color: #30d15840; color: #30d158; }
+    .badge.yellow { border-color: #ff9f0a40; color: #ff9f0a; }
+
+    /* Floating SOS */
+    .sos-float {
+      position: fixed;
+      bottom: 24px;
+      right: 20px;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #ff3b30;
+      color: white;
+      border: none;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      z-index: 999;
+      box-shadow: 0 4px 20px rgba(255,59,48,0.5);
+    }
+
+    /* SOS overlay */
+    #sos-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 3000;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    #sos-overlay.visible { display: flex; }
+    #sos-overlay h2 { color: #ff3b30; font-size: 28px; }
+    #countdown-num  { color: #ff9f0a; font-size: 64px; font-weight: 200; }
+
+    #cancel-sos-btn {
+      background: #333; color: #fff; border: none;
+      padding: 14px 36px; border-radius: 24px; font-size: 16px; cursor: pointer;
+    }
+
+    #pin-input {
+      background: #222; border: 1px solid #444; color: #fff;
+      padding: 10px 16px; border-radius: 12px; font-size: 20px;
+      text-align: center; width: 160px; letter-spacing: 6px;
+    }
+
+    /* autocomplete dark */
+    .pac-container { background:#1c1c1e!important; border:1px solid #3a3a3c!important; border-radius:12px!important; }
+    .pac-item { color:#fff!important; border-top:1px solid #2c2c2e!important; padding:8px 12px!important; }
+    .pac-item:hover { background:#2c2c2e!important; }
+    .pac-item-query { color:#fff!important; }
+  </style>
+</head>
+<body>
+
+<!-- SOS floating button -->
+<button class="sos-float" onclick="startSOSCountdown()">SOS</button>
+
+<!-- SOS countdown overlay -->
+<div id="sos-overlay">
+  <h2>⚠ SOS Activating</h2>
+  <div id="countdown-num">10</div>
+  <p style="color:#fff;">Enter PIN to cancel</p>
+  <input type="password" id="pin-input" maxlength="4" placeholder="••••" oninput="checkPin(this.value)"/>
+  <button id="cancel-sos-btn" onclick="cancelSOS()">Cancel SOS</button>
+  <p style="color:#888;font-size:13px;">If you do nothing, SOS fires automatically</p>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">SHE<span>ild</span> Safe Route</div>
+  <a href="/" class="back-btn">← Back</a>
+</div>
+
+<!-- Search panel -->
+<div class="search-panel">
+
+  <div class="input-group">
+    <span class="input-label">From (your location)</span>
+    <button class="location-btn" onclick="useMyLocation()">
+      📍 Detect my current location
+    </button>
+    <div class="from-status" id="from-status">✓ Location detected</div>
+  </div>
+
+  <div class="input-group">
+    <span class="input-label">To (destination)</span>
+    <input type="text" class="route-input" id="to-input"
+           placeholder="Type destination e.g. Hyderabad Bus Stand..."/>
+    <div style="font-size:11px;color:#555;margin-top:4px;">
+      💡 Or tap anywhere on the map to set destination
+    </div>
+  </div>
+
+  <button class="go-btn" onclick="findSafeRoute()">🗺 Find Safe Route</button>
+
+</div>
+
+<!-- Map -->
+<div id="map"></div>
+
+<!-- Route info -->
+<div class="info-panel" id="info-panel">
+  <div class="route-stats">
+    <div class="stat">
+      <div class="stat-value" id="stat-distance">—</div>
+      <div class="stat-label">Distance</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="stat-duration">—</div>
+      <div class="stat-label">Walk time</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="stat-police">—</div>
+      <div class="stat-label">Police stations</div>
+    </div>
+  </div>
+  <div class="safety-badges">
+    <div class="badge green">✓ Walking route</div>
+    <div class="badge green">✓ Safe path</div>
+    <div class="badge" id="badge-police">Locating police stations...</div>
+  </div>
+</div>
+
+<script>
+  let map, directionsService, directionsRenderer;
+  let userLatLng  = null;   // google.maps.LatLng object — used for routing
+  let destLatLng  = null;   // set when user taps map
+  let policeMarkers = [];
+  let countdownTimer = null, sosSeconds = 10;
+
+  /* ════════════════════════════════════
+     MAP INIT
+  ════════════════════════════════════ */
+  function initMap() {
+    map = new google.maps.Map(document.getElementById('map'), {
+      zoom: 14,
+      center: { lat: 17.3850, lng: 78.4867 },
+      styles: [
+        { elementType: 'geometry',           stylers: [{ color: '#1a1a2e' }] },
+        { elementType: 'labels.text.fill',   stylers: [{ color: '#9ca5b3' }] },
+        { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a2e' }] },
+        { featureType: 'road', elementType: 'geometry',         stylers: [{ color: '#2a2a3e' }] },
+        { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca5b3' }] },
+        { featureType: 'water',              stylers: [{ color: '#0d1b2a' }] },
+        { featureType: 'poi',                stylers: [{ visibility: 'off' }] }
+      ]
+    });
+
+    directionsService  = new google.maps.DirectionsService();
+    directionsRenderer = new google.maps.DirectionsRenderer({
+      map: map,
+      suppressMarkers: false,
+      polylineOptions: {
+        strokeColor: '#30d158',
+        strokeWeight: 6,
+        strokeOpacity: 0.9
+      }
+    });
+
+    // Autocomplete on destination input
+    const autocomplete = new google.maps.places.Autocomplete(
+      document.getElementById('to-input'),
+      { componentRestrictions: { country: 'in' } }
+    );
+
+    // When autocomplete selects a place — store its LatLng
+    autocomplete.addListener('place_changed', function() {
+      const place = autocomplete.getPlace();
+      if (place.geometry) {
+        destLatLng = place.geometry.location;
+      }
+    });
+
+    // Tap map → set destination
+    map.addListener('click', function(e) {
+      destLatLng = e.latLng;
+      const geocoder = new google.maps.Geocoder();
+      geocoder.geocode({ location: destLatLng }, function(results, status) {
+        if (status === 'OK' && results[0]) {
+          document.getElementById('to-input').value = results[0].formatted_address;
+        } else {
+          document.getElementById('to-input').value =
+            destLatLng.lat().toFixed(5) + ', ' + destLatLng.lng().toFixed(5);
+        }
+      });
+
+      // Show destination marker
+      new google.maps.Marker({
+        position: destLatLng,
+        map: map,
+        title: 'Destination',
+        icon: {
+          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+          scale: 6,
+          fillColor: '#ff9f0a',
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 2
+        }
+      });
+    });
+
+    // Auto detect location on load
+    useMyLocation();
+  }
+
+  /* ════════════════════════════════════
+     GET USER LOCATION
+  ════════════════════════════════════ */
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      alert('Geolocation not supported on this device');
+      return;
+    }
+
+    document.getElementById('from-status').style.display = 'none';
+
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+
+        // ── Store as LatLng OBJECT — this is what fixes routing ──
+        userLatLng = new google.maps.LatLng(lat, lng);
+
+        // Show status
+        document.getElementById('from-status').style.display = 'block';
+        document.getElementById('from-status').textContent =
+          '✓ Location detected: ' + lat.toFixed(4) + ', ' + lng.toFixed(4);
+
+        // Center map
+        map.setCenter(userLatLng);
+        map.setZoom(15);
+
+        // User marker (green dot)
+        new google.maps.Marker({
+          position: userLatLng,
+          map: map,
+          title: 'You are here',
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: '#30d158',
+            fillOpacity: 1,
+            strokeColor: '#fff',
+            strokeWeight: 3
+          }
+        });
+
+        // Find police stations near user
+        findNearbyPoliceStations(lat, lng);
+      },
+      function(err) {
+        document.getElementById('from-status').style.display = 'block';
+        document.getElementById('from-status').style.color = '#ff9f0a';
+        document.getElementById('from-status').textContent =
+          '⚠ Location access denied — please allow location in browser settings';
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  /* ════════════════════════════════════
+     FIND POLICE STATIONS
+  ════════════════════════════════════ */
+  function findNearbyPoliceStations(lat, lng) {
+    const service = new google.maps.places.PlacesService(map);
+    service.nearbySearch({
+      location: { lat, lng },
+      radius: 3000,
+      keyword: 'police station'
+    }, function(results, status) {
+      policeMarkers.forEach(m => m.setMap(null));
+      policeMarkers = [];
+
+      if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
+        results.forEach(function(place) {
+          const marker = new google.maps.Marker({
+            position : place.geometry.location,
+            map      : map,
+            title    : place.name,
+            icon     : {
+              path        : google.maps.SymbolPath.CIRCLE,
+              scale       : 9,
+              fillColor   : '#0a84ff',
+              fillOpacity : 1,
+              strokeColor : '#fff',
+              strokeWeight: 2
+            }
+          });
+
+          const iw = new google.maps.InfoWindow({
+            content: `<div style="color:#000;font-size:13px;padding:4px;">
+              <strong>🚔 ${place.name}</strong><br/>
+              <span style="color:#555;">${place.vicinity || ''}</span>
+            </div>`
+          });
+
+          marker.addListener('click', () => iw.open(map, marker));
+          policeMarkers.push(marker);
+        });
+
+        document.getElementById('stat-police').textContent = results.length;
+        document.getElementById('badge-police').textContent =
+          '🚔 ' + results.length + ' police stations nearby';
+        document.getElementById('badge-police').classList.add('green');
+      } else {
+        document.getElementById('stat-police').textContent = '0';
+        document.getElementById('badge-police').textContent = 'No police stations found';
+        document.getElementById('badge-police').classList.add('yellow');
+      }
+    });
+  }
+
+  /* ════════════════════════════════════
+     FIND SAFE ROUTE — uses LatLng objects, NOT strings
+  ════════════════════════════════════ */
+  function findSafeRoute() {
+
+    // Origin — must be LatLng object if detected, else text
+    let origin = userLatLng;
+    if (!origin) {
+      alert('Please tap "Detect my current location" first');
+      return;
+    }
+
+    // Destination — LatLng object if tapped on map, else text from input
+    let destination = destLatLng;
+    if (!destination) {
+      destination = document.getElementById('to-input').value.trim();
+      if (!destination) {
+        alert('Please enter or tap a destination on the map');
+        return;
+      }
+    }
+
+    directionsService.route({
+      origin               : origin,       // LatLng object — no geocoding needed
+      destination          : destination,  // LatLng object or text string
+      travelMode           : google.maps.TravelMode.WALKING,
+      provideRouteAlternatives: true
+    }, function(result, status) {
+
+      if (status === 'OK') {
+        directionsRenderer.setDirections(result);
+
+        // Show route stats
+        const leg = result.routes[0].legs[0];
+        document.getElementById('stat-distance').textContent = leg.distance.text;
+        document.getElementById('stat-duration').textContent = leg.duration.text;
+        document.getElementById('info-panel').classList.add('visible');
+
+        // Find police near destination too
+        const dLat = leg.end_location.lat();
+        const dLng = leg.end_location.lng();
+        findNearbyPoliceStations(dLat, dLng);
+
+      } else {
+        // Show exact error for debugging
+        let msg = 'Could not find route.\n\nReason: ' + status;
+        if (status === 'ZERO_RESULTS') {
+          msg = 'No walking route found between these two locations.\n\nTry a closer destination.';
+        } else if (status === 'NOT_FOUND') {
+          msg = 'One of the locations was not found.\n\nPlease tap the map to set destination instead of typing.';
+        }
+        alert(msg);
+      }
+    });
+  }
+
+  /* ════════════════════════════════════
+     SOS
+  ════════════════════════════════════ */
+  function getCancelPin() {
+    return localStorage.getItem('sheild_pin') || '1234';
+  }
+
+  function startSOSCountdown() {
+    sosSeconds = 10;
+    document.getElementById('sos-overlay').classList.add('visible');
+    document.getElementById('countdown-num').textContent = sosSeconds;
+    document.getElementById('pin-input').value = '';
+
+    countdownTimer = setInterval(function() {
+      sosSeconds--;
+      document.getElementById('countdown-num').textContent = sosSeconds;
+      if (sosSeconds <= 0) {
+        clearInterval(countdownTimer);
+        fireSOS();
+      }
+    }, 1000);
+  }
+
+  function cancelSOS() {
+    clearInterval(countdownTimer);
+    document.getElementById('sos-overlay').classList.remove('visible');
+  }
+
+  function checkPin(val) {
+    if (val === getCancelPin()) cancelSOS();
+  }
+
+  function fireSOS() {
+    document.getElementById('sos-overlay').classList.remove('visible');
+
+    const lat = userLatLng ? userLatLng.lat() : null;
+    const lng = userLatLng ? userLatLng.lng() : null;
+
+    fetch('/sos', {
+      method  : 'POST',
+      headers : { 'Content-Type': 'application/json' },
+      body    : JSON.stringify({ lat, lng, time: new Date().toISOString() })
+    })
+    .then(r => r.json())
+    .then(data => {
+      alert('🚨 SOS sent!\nHelp is on the way.\n\nAlert ID: ' + data.alert_id);
+    })
+    .catch(function() {
+      // Offline — try native SMS
+      try {
+        const cfg   = JSON.parse(localStorage.getItem('sheild_config') || '{}');
+        const phone = cfg.contacts && cfg.contacts[0] ? cfg.contacts[0].phone : '';
+        if (!phone) return;
+        const cleaned = phone.replace(/\D/g, '').slice(-10);
+        const msg     = encodeURIComponent('SOS EMERGENCY! I need help RIGHT NOW. Please call me immediately!');
+        const isIOS   = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const a       = document.createElement('a');
+        a.href        = isIOS
+          ? 'sms:' + cleaned + '&body=' + msg
+          : 'sms:+91' + cleaned + '?body=' + msg;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 1000);
+      } catch(e) {}
+    });
+  }
+</script>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAP7__5xM64YmapiegQM6On7-rolHXr2Uo&libraries=places&callback=initMap" async defer></script>
+
+</body>
+</html>
