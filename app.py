@@ -1,4 +1,3 @@
-import requests as req
 from flask import Flask, render_template, request, jsonify
 import smtplib, os, json, socket
 from email.mime.text import MIMEText
@@ -14,12 +13,6 @@ app = Flask(__name__)
 # ══════════════════════════════════════════════════════
 YOUR_EMAIL    = "YOUR_EMAIL"
 YOUR_PASSWORD = "YOUR_APP_PASSWORD"
-
-TWILIO_ENABLED = True
-TWILIO_SID     = "YOUR_TWILIO_SID"
-TWILIO_TOKEN   = "YOUR_TWILIO_TOKEN"
-TWILIO_FROM    = "YOUR_TWILIO_NUMBER"
-
 # ══════════════════════════════════════════════════════
 #   YOUR NAME shown in alerts
 # ══════════════════════════════════════════════════════
