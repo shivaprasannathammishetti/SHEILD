@@ -348,30 +348,27 @@ def upload_audio():
             alert['audio_file'] = filename
             break
 
-    # ── Send audio as email attachment via Brevo base64 ──
-    for contact in TRUSTED_CONTACTS:
-        success = send_email(
-            to_email        = contact['email'],
-            subject         = '🎙 Audio Evidence — SHEild SOS Recording',
-            body            = (
-                f"Audio evidence recording is attached to this email.\n\n"
-                f"Alert ID  : {alert_id}\n"
-                f"Recorded  : {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
-                f"File size : {file_size} bytes\n\n"
-                f"This 30-second recording was captured silently during the SOS alert.\n"
-                f"Open the attached .webm file with any media player (VLC, Chrome, etc).\n\n"
-                f"Keep this as evidence.\n\n"
-                f"— SHEild Safety System"
-            ),
-            attachment_path = filename   # ← now works with Brevo base64
+    # ── Send downloadable audio evidence link ──
+audio_link = f"https://sheild-e86f.onrender.com/evidence/{alert_id}.webm"
+
+for contact in TRUSTED_CONTACTS:
+    success = send_email(
+        to_email = contact['email'],
+        subject  = '🎙 Audio Evidence — SHEild SOS Recording',
+        body     = (
+            f"Audio evidence recording was captured during the SOS alert.\n\n"
+            f"Alert ID : {alert_id}\n\n"
+            f"Audio Evidence Link:\n"
+            f"{audio_link}\n\n"
+            f"Open this link in browser to hear/download the recording.\n\n"
+            f"— SHEild Safety System"
         )
-        if success:
-            print(f"  ✓ Audio email with attachment sent to: {contact['email']}")
-        else:
-            print(f"  ✗ Audio email failed for: {contact['email']}")
+    )
 
-    return jsonify({'status': 'audio saved', 'file': filename, 'size': file_size})
-
+    if success:
+        print(f"  ✓ Audio evidence link sent to: {contact['email']}")
+    else:
+        print(f"  ✗ Audio email failed for: {contact['email']}")
 
 # ── Serve audio evidence files ────────────────────────
 @app.route('/evidence/<filename>')
