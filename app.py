@@ -70,8 +70,6 @@ def send_email(to_email, subject, body, attachment_path=None):
     try:
         import requests as req
         print(f"  Attempting Brevo email to: {to_email}")
-
-        response = req.post(
         response = req.post(
             'https://api.brevo.com/v3/smtp/email',
             headers={
