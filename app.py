@@ -1,169 +1,134 @@
-from flask import Flask, render_template, request, jsonify
+import requests as req
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import smtplib, os, json, socket, base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
-from datetime import datetime
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 
 # ══════════════════════════════════════════════════════
-#   YOUR GMAIL CREDENTIALS
+#   GMAIL  (reads from Render env vars OR uses defaults)
 # ══════════════════════════════════════════════════════
-YOUR_EMAIL    = os.environ.get('YOUR_EMAIL', 'thammishettishivaprasanna@gmail.com')
+YOUR_EMAIL    = os.environ.get('YOUR_EMAIL',    'thammishettishivaprasanna@gmail.com')
 YOUR_PASSWORD = os.environ.get('YOUR_PASSWORD', 'yxfzhltvgyvdoahz')
 
 # ══════════════════════════════════════════════════════
-#   YOUR NAME shown in alerts
+#   FAST2SMS  ← set this in Render → Environment
+#   Sign up free at https://www.fast2sms.com
+#   Dashboard → Dev API → copy key → paste in Render env
 # ══════════════════════════════════════════════════════
+FAST2SMS_KEY = os.environ.get('FAST2SMS_KEY', 'YOUR_FAST2SMS_KEY')
+
 YOUR_NAME = "SHEild User"
 
 # ══════════════════════════════════════════════════════
-#   SERVER HOST — auto detect Render or local
+#   HOST — auto-detects Render or local
 # ══════════════════════════════════════════════════════
-def get_local_ip():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except:
-        return '127.0.0.1'
+RENDER_HOST = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '')
+IS_RENDER   = bool(RENDER_HOST)
+SERVER_BASE = f"https://{RENDER_HOST}" if IS_RENDER else "http://localhost:5000"
+SERVER_PORT = int(os.environ.get('PORT', 5000))
 
-SERVER_HOST = os.environ.get('RENDER_EXTERNAL_HOSTNAME', get_local_ip())
-SERVER_PORT = 443 if os.environ.get('RENDER_EXTERNAL_HOSTNAME') else 5000
-IS_RENDER   = bool(os.environ.get('RENDER_EXTERNAL_HOSTNAME'))
-
-# ──────────────────────────────────────────────────────
-# Runtime state
-# ──────────────────────────────────────────────────────
-TRUSTED_CONTACTS = []
-CANCEL_PIN       = "1234"
-
-# Evidence folder — absolute path so it works on Render
+# ══════════════════════════════════════════════════════
+#   PATHS
+# ══════════════════════════════════════════════════════
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 EVIDENCE_DIR = os.path.join(BASE_DIR, 'evidence')
+CONFIG_PATH  = os.path.join(BASE_DIR, 'config.json')
 os.makedirs(EVIDENCE_DIR, exist_ok=True)
 
-alerts = []
+TRUSTED_CONTACTS = []
+CANCEL_PIN       = "1234"
+alerts           = []
 
 
-# ── Load saved config on startup ──────────────────────
+def utcnow():
+    return datetime.now(timezone.utc)
+
+
+# ── Load config ───────────────────────────────────────
 def load_config():
     global TRUSTED_CONTACTS, CANCEL_PIN
-    config_path = os.path.join(BASE_DIR, 'config.json')
-    if os.path.exists(config_path):
-        with open(config_path) as f:
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH) as f:
             saved = json.load(f)
-            TRUSTED_CONTACTS = [
-                c for c in saved.get('contacts', [])
-                if c.get('email')
-            ]
-            CANCEL_PIN = saved.get('pin', '1234')
+        TRUSTED_CONTACTS = [c for c in saved.get('contacts', []) if c.get('email')]
+        CANCEL_PIN = saved.get('pin', '1234')
         print(f"\nConfig loaded:")
         for c in TRUSTED_CONTACTS:
-            print(f"  Contact : {c.get('name')} | {c.get('email')} | {c.get('phone','no phone')}")
-        print(f"  PIN     : {CANCEL_PIN}\n")
+            print(f"  {c.get('name')} | {c.get('email')} | {c.get('phone','no phone')}")
+        print(f"  PIN  : {CANCEL_PIN}")
+        print(f"  Host : {SERVER_BASE}")
+        sms_ok = not FAST2SMS_KEY.startswith('YOUR_')
+        print(f"  SMS  : {'Fast2SMS ready ✓' if sms_ok else 'NOT SET — add FAST2SMS_KEY env var'}\n")
     else:
-        print("\nNo config.json found — go to /setup first\n")
+        print("\nNo config.json — go to /setup first\n")
 
 load_config()
 
 
 # ══════════════════════════════════════════════════════
-#   SEND EMAIL
-#   Uses Brevo API — supports attachments via base64
+#   SEND EMAIL  (Gmail SMTP — plain text, no attachment)
 # ══════════════════════════════════════════════════════
-def send_email(to_email, subject, body, attachment_path=None):
+def send_email(to_email, subject, body):
     try:
-        import requests as req
-        print(f"  Attempting Brevo email to: {to_email}")
+        msg            = MIMEMultipart()
+        msg['Subject'] = subject
+        msg['From']    = YOUR_EMAIL
+        msg['To']      = to_email
+        msg.attach(MIMEText(body, 'plain'))
 
-        payload = {
-            'sender'     : {'email': YOUR_EMAIL},
-            'to'         : [{'email': to_email}],
-            'subject'    : subject,
-            'textContent': body
-        }
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(YOUR_EMAIL, YOUR_PASSWORD)
+            smtp.send_message(msg)
 
-        # ── Add attachment if file exists ──
-        if attachment_path and os.path.exists(attachment_path):
-            file_size = os.path.getsize(attachment_path)
-            print(f"  Attaching file: {attachment_path} ({file_size} bytes)")
-
-            with open(attachment_path, 'rb') as f:
-                file_data = f.read()
-
-            # Brevo requires base64 encoded attachment
-            encoded_data = base64.b64encode(file_data).decode('utf-8')
-            fname        = os.path.basename(attachment_path)
-
-            payload['attachment'] = [{
-                'content': encoded_data,
-                'name'   : fname
-            }]
-            print(f"  Attachment encoded: {len(encoded_data)} chars base64")
-        else:
-            if attachment_path:
-                print(f"  WARNING: Attachment file not found: {attachment_path}")
-
-        response = req.post(
-            'https://api.brevo.com/v3/smtp/email',
-            headers={
-                'api-key'     : os.environ.get('BREVO_API_KEY', ''),
-                'Content-Type': 'application/json'
-            },
-            json=payload,
-            timeout=15
-        )
-
-        if response.status_code == 201:
-            print(f"  ✓ Email sent to: {to_email}")
-            return True
-        else:
-            print(f"  ✗ Email failed: {response.status_code} — {response.text[:200]}")
-            return False
-
+        print(f"  ✓ Email → {to_email}")
+        return True
+    except smtplib.SMTPAuthenticationError:
+        print(f"  ✗ Gmail auth failed")
+        return False
     except Exception as e:
         print(f"  ✗ Email error: {e}")
         return False
 
 
 # ══════════════════════════════════════════════════════
-#   SEND SMS via SMS Gateway app
+#   SEND SMS  (Fast2SMS — works from Render, no phone app)
 # ══════════════════════════════════════════════════════
 def send_sms(to_phone, body):
-    phone = to_phone.strip().replace(' ', '').replace('-', '')
-    if not phone:
-        print(f"  SMS skipped — no phone number")
+    if not to_phone or not to_phone.strip():
+        print("  SMS skipped — no phone")
         return False
 
-    phone = phone[-10:]
+    phone = to_phone.strip().replace(' ', '').replace('-', '')[-10:]
+
+    if FAST2SMS_KEY.startswith('YOUR_'):
+        print("  SMS skipped — FAST2SMS_KEY not set in Render env vars")
+        return False
 
     try:
-        import requests as req
-        SMS_GATEWAY_URL = os.environ.get('SMS_GATEWAY_URL', 'https://skimmed-upchuck-document.ngrok-free.dev/send-sms')
-        response = req.post(
-            SMS_GATEWAY_URL,
-            json={'phone': phone, 'message': body},
-            timeout=40
+        r = req.post(
+            "https://www.fast2sms.com/dev/bulkV2",
+            headers={"authorization": FAST2SMS_KEY, "Content-Type": "application/json"},
+            json={"route": "q", "message": body, "numbers": phone},
+            timeout=15
         )
-
-        if response.status_code == 200:
-            print(f"  ✓ SMS sent to: {phone}")
+        result = r.json()
+        if result.get("return") is True:
+            print(f"  ✓ SMS → {phone}")
             return True
         else:
-            print(f"  ✗ SMS failed: {response.status_code}")
+            print(f"  ✗ SMS failed: {result.get('message', result)}")
             return False
-
     except Exception as e:
         print(f"  ✗ SMS error: {e}")
         return False
 
 
-# ── Pages ─────────────────────────────────────────────
+# ══════════════════════════════════════════════════════
+#   PAGES
+# ══════════════════════════════════════════════════════
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -188,8 +153,6 @@ def history():
 def saferoute():
     return render_template('saferoute.html')
 
-
-# ── Live tracking ─────────────────────────────────────
 @app.route('/track/<alert_id>')
 def track(alert_id):
     alert = next((a for a in alerts if a['id'] == alert_id), None)
@@ -199,41 +162,38 @@ def track(alert_id):
 def track_data(alert_id):
     alert = next((a for a in alerts if a['id'] == alert_id), None)
     if alert:
-        return jsonify({
-            'lat'  : alert.get('lat'),
-            'lng'  : alert.get('lng'),
-            'time' : alert.get('time'),
-            'maps' : alert.get('maps'),
-            'audio': alert.get('audio', False)
-        })
+        return jsonify({'lat': alert.get('lat'), 'lng': alert.get('lng'),
+                        'time': alert.get('time'), 'maps': alert.get('maps'),
+                        'audio': alert.get('audio', False)})
     return jsonify({}), 404
 
+@app.route('/alerts')
+def get_alerts():
+    return jsonify(alerts)
 
-# ── Save setup config ─────────────────────────────────
+@app.route('/evidence/<filename>')
+def serve_evidence(filename):
+    return send_from_directory(EVIDENCE_DIR, filename)
+
+
+# ══════════════════════════════════════════════════════
+#   SETUP
+# ══════════════════════════════════════════════════════
 @app.route('/setup', methods=['POST'])
 def save_setup():
     global TRUSTED_CONTACTS, CANCEL_PIN
-
     data = request.get_json()
-    print(f"\nSetup received: {data}")
 
-    TRUSTED_CONTACTS = [
-        c for c in data.get('contacts', [])
-        if c.get('email') and c['email'].strip()
-    ]
+    TRUSTED_CONTACTS = [c for c in data.get('contacts', [])
+                        if c.get('email') and c['email'].strip()]
     CANCEL_PIN = data.get('pin', '1234')
 
-    config_path = os.path.join(BASE_DIR, 'config.json')
-    with open(config_path, 'w') as f:
-        json.dump({
-            'contacts' : data.get('contacts', []),
-            'pin'      : CANCEL_PIN,
-            'gesture'  : data.get('gesture', 'key_s'),
-            'from'     : data.get('from', '20'),
-            'to'       : data.get('to', '6')
-        }, f, indent=2)
+    with open(CONFIG_PATH, 'w') as f:
+        json.dump({'contacts': data.get('contacts', []), 'pin': CANCEL_PIN,
+                   'gesture': data.get('gesture', 'key_s'),
+                   'from': data.get('from', '20'), 'to': data.get('to', '6')}, f, indent=2)
 
-    print(f"Setup saved — contacts: {[c.get('email') for c in TRUSTED_CONTACTS]}")
+    print(f"\nSetup saved — {[c.get('email') for c in TRUSTED_CONTACTS]}")
 
     for contact in TRUSTED_CONTACTS:
         send_email(
@@ -242,219 +202,219 @@ def save_setup():
             body     = (
                 f"Hello {contact.get('name', '')},\n\n"
                 f"You have been added as a trusted emergency contact on SHEild.\n\n"
-                f"If this person triggers an SOS alert, you will receive an automatic "
-                f"emergency email with their live GPS location.\n\n"
+                f"If an SOS is triggered you will receive an immediate email AND SMS "
+                f"with a live GPS tracking link.\n\n"
                 f"Please respond immediately if you receive an SOS alert.\n\n"
                 f"— SHEild Safety System"
             )
         )
+        if contact.get('phone'):
+            send_sms(contact['phone'],
+                     f"SHEild: You are now a trusted contact for {YOUR_NAME}. "
+                     f"You will receive SMS alerts if they need help.")
 
-    return jsonify({
-        'status'   : 'saved',
-        'contacts' : [c['email'] for c in TRUSTED_CONTACTS],
-        'pin'      : CANCEL_PIN
-    })
+    return jsonify({'status': 'saved',
+                    'contacts': [c['email'] for c in TRUSTED_CONTACTS],
+                    'pin': CANCEL_PIN})
 
 
-# ── Receive SOS alert ─────────────────────────────────
+# ══════════════════════════════════════════════════════
+#   SOS ALERT
+# ══════════════════════════════════════════════════════
 @app.route('/sos', methods=['POST'])
 def sos():
-    data = request.get_json()
-    lat  = data.get('lat')
-    lng  = data.get('lng')
-    time = data.get('time', datetime.utcnow().isoformat())
-
+    data       = request.get_json()
+    lat        = data.get('lat')
+    lng        = data.get('lng')
+    time_str   = data.get('time', utcnow().isoformat())
     maps_link  = f"https://maps.google.com/?q={lat},{lng}" if lat else "GPS unavailable"
-    alert_id   = f"alert_{len(alerts)+1}_{int(datetime.utcnow().timestamp())}"
-    protocol   = 'https' if IS_RENDER else 'http'
-    track_link = f"{protocol}://{SERVER_HOST}/track/{alert_id}"
+    alert_id   = f"alert_{len(alerts)+1}_{int(utcnow().timestamp())}"
+    track_link = f"{SERVER_BASE}/track/{alert_id}"
 
-    alert = {
-        'id'    : alert_id,
-        'lat'   : lat,
-        'lng'   : lng,
-        'time'  : time,
-        'maps'  : maps_link,
-        'audio' : False
-    }
-    alerts.append(alert)
+    alerts.append({'id': alert_id, 'lat': lat, 'lng': lng, 'time': time_str,
+                   'maps': maps_link, 'audio': False})
 
-    print(f"\nSOS received!")
-    print(f"  Alert ID   : {alert_id}")
-    print(f"  Location   : {maps_link}")
-    print(f"  Live track : {track_link}")
-    print(f"  Contacts   : {[c.get('email') for c in TRUSTED_CONTACTS]}")
+    print(f"\n🚨 SOS received! ID={alert_id}  Location={maps_link}")
 
     if not TRUSTED_CONTACTS:
-        print("  WARNING: No trusted contacts configured!")
-        return jsonify({
-            'status'   : 'SOS received but no contacts configured',
-            'alert_id' : alert_id,
-            'maps'     : maps_link
-        })
+        print("  WARNING: No trusted contacts!")
+        return jsonify({'status': 'no contacts', 'alert_id': alert_id})
 
     email_body = (
         f"🚨 SOS ALERT — {YOUR_NAME} needs help!\n\n"
-        f"Time     : {time}\n"
+        f"Time     : {time_str}\n"
         f"Location : {maps_link}\n\n"
-        f"LIVE TRACKING LINK (updates every 10s):\n"
-        f"{track_link}\n\n"
-        f"Open on Google Maps: {maps_link}\n\n"
-        f"This is an automatic emergency alert from SHEild.\n"
-        f"Please respond immediately.\n\n"
-        f"Alert ID : {alert_id}"
+        f"▶ LIVE TRACKING (updates every 10 seconds):\n{track_link}\n\n"
+        f"▶ Open in Google Maps: {maps_link}\n\n"
+        f"Respond immediately.\n\nAlert ID: {alert_id}"
     )
-
     sms_body = (
-        f"SOS! {YOUR_NAME} needs help NOW!\n"
-        f"Location: {maps_link}\nTrack: {track_link}"
+        f"🚨 SOS! {YOUR_NAME} needs help!\nLocation: {maps_link}\nTrack live: {track_link}"
         if lat else
-        f"SOS! {YOUR_NAME} needs help NOW!\nGPS unavailable. Call immediately!"
+        f"🚨 SOS! {YOUR_NAME} needs help NOW!\nGPS unavailable. Call immediately! Alert: {alert_id}"
     )
 
     for contact in TRUSTED_CONTACTS:
-        send_email(to_email=contact['email'], subject='🚨 SOS - Emergency Alert from SHEild', body=email_body)
+        send_email(contact['email'], '🚨 SOS - Emergency Alert from SHEild', email_body)
         if contact.get('phone'):
-            send_sms(to_phone=contact['phone'], body=sms_body)
+            send_sms(contact['phone'], sms_body)
 
-    return jsonify({
-        'status'   : 'SOS sent',
-        'alert_id' : alert_id,
-        'maps'     : maps_link,
-        'track'    : track_link
-    })
+    return jsonify({'status': 'SOS sent', 'alert_id': alert_id,
+                    'maps': maps_link, 'track': track_link})
 
 
-# ── Receive audio evidence ────────────────────────────
+# ══════════════════════════════════════════════════════
+#   AUDIO EVIDENCE
+#   Saves file on Render, emails a DOWNLOAD LINK
+#   (no attachment — Brevo/Gmail both reject .webm)
+# ══════════════════════════════════════════════════════
 @app.route('/upload-audio', methods=['POST'])
 def upload_audio():
-    if 'audio' not in request.files:
-        return jsonify({'status': 'no audio file'}), 400
+    try:
+        if 'audio' not in request.files:
+            return jsonify({'status': 'no audio file'}), 400
 
-    audio_file = request.files['audio']
-    alert_id   = request.form.get('alert_id', 'unknown')
+        audio_file = request.files['audio']
+        alert_id   = request.form.get('alert_id', 'unknown')
+        fname      = f"{alert_id}.webm"
+        save_path  = os.path.join(EVIDENCE_DIR, fname)
 
-    # ── Save to absolute path ──
-    filename = os.path.join(EVIDENCE_DIR, f"{alert_id}.webm")
-    audio_file.save(filename)
+        audio_file.save(save_path)
+        file_size = os.path.getsize(save_path)
+        print(f"\n🎙 Audio saved: {save_path} ({file_size} bytes)")
 
-    file_size = os.path.getsize(filename)
-    print(f"\n🎙 Audio evidence saved: {filename} ({file_size} bytes)")
+        # Mark alert as having audio
+        for alert in alerts:
+            if alert['id'] == alert_id:
+                alert['audio']      = True
+                alert['audio_file'] = save_path
+                alert['audio_link'] = f"{SERVER_BASE}/evidence/{fname}"
+                break
 
-    # Mark alert as having audio
+        # Public link to play/download the recording
+        audio_link = f"{SERVER_BASE}/evidence/{fname}"
+        print(f"  Audio link: {audio_link}")
+
+        if not TRUSTED_CONTACTS:
+            print("  No contacts to email audio link to")
+            return jsonify({'status': 'audio saved, no contacts', 'link': audio_link})
+
+        # Email a clickable download link — no attachment needed
+        for contact in TRUSTED_CONTACTS:
+            success = send_email(
+                to_email = contact['email'],
+                subject  = '🎙 Audio Evidence — SHEild SOS Recording',
+                body     = (
+                    f"Audio evidence was recorded during the SOS alert.\n\n"
+                    f"Alert ID  : {alert_id}\n"
+                    f"Recorded  : {utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n\n"
+                    f"▶ LISTEN / DOWNLOAD RECORDING:\n"
+                    f"{audio_link}\n\n"
+                    f"Click the link above to play or download the 30-second recording.\n"
+                    f"Please save it as evidence.\n\n"
+                    f"— SHEild Safety System"
+                )
+            )
+            if success:
+                print(f"  ✓ Audio link emailed → {contact['email']}")
+            else:
+                print(f"  ✗ Audio email failed → {contact['email']}")
+
+            # Also SMS the link
+            if contact.get('phone'):
+                send_sms(contact['phone'],
+                         f"🎙 SHEild audio evidence recorded.\nListen: {audio_link}")
+
+        return jsonify({'status': 'audio saved and notified', 'link': audio_link})
+
+    except Exception as e:
+        print(f"  ✗ upload_audio error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ══════════════════════════════════════════════════════
+#   LATE GPS FOLLOW-UP
+# ══════════════════════════════════════════════════════
+@app.route('/sos-update', methods=['POST'])
+def sos_update():
+    data      = request.get_json()
+    alert_id  = data.get('alert_id')
+    lat       = data.get('lat')
+    lng       = data.get('lng')
+    if not lat or not lng:
+        return jsonify({'status': 'no GPS'}), 400
+
+    maps_link = f"https://maps.google.com/?q={lat},{lng}"
     for alert in alerts:
         if alert['id'] == alert_id:
-            alert['audio']      = True
-            alert['audio_file'] = filename
+            alert['lat'] = lat; alert['lng'] = lng; alert['maps'] = maps_link
             break
 
-    # ── Send downloadable audio evidence link ──
-audio_link = f"https://sheild-e86f.onrender.com/evidence/{alert_id}.webm"
+    print(f"\n📍 GPS follow-up for {alert_id}: {maps_link}")
+    for contact in TRUSTED_CONTACTS:
+        if contact.get('phone'):
+            send_sms(contact['phone'],
+                     f"📍 SHEild Location Update\nGPS locked for earlier SOS.\nLocation: {maps_link}")
 
-for contact in TRUSTED_CONTACTS:
-    success = send_email(
-        to_email = contact['email'],
-        subject  = '🎙 Audio Evidence — SHEild SOS Recording',
-        body     = (
-            f"Audio evidence recording was captured during the SOS alert.\n\n"
-            f"Alert ID : {alert_id}\n\n"
-            f"Audio Evidence Link:\n"
-            f"{audio_link}\n\n"
-            f"Open this link in browser to hear/download the recording.\n\n"
-            f"— SHEild Safety System"
-        )
-    )
-
-    if success:
-        print(f"  ✓ Audio evidence link sent to: {contact['email']}")
-    else:
-        print(f"  ✗ Audio email failed for: {contact['email']}")
-
-# ── Serve audio evidence files ────────────────────────
-@app.route('/evidence/<filename>')
-def serve_evidence(filename):
-    from flask import send_from_directory
-    return send_from_directory(EVIDENCE_DIR, filename)
+    return jsonify({'status': 'updated', 'maps': maps_link})
 
 
-# ── Update location ───────────────────────────────────
+# ══════════════════════════════════════════════════════
+#   CONTINUOUS LOCATION UPDATE
+# ══════════════════════════════════════════════════════
 @app.route('/update-location', methods=['POST'])
 def update_location():
-    data     = request.get_json()
+    data = request.get_json()
     alert_id = data.get('alert_id')
-    lat      = data.get('lat')
-    lng      = data.get('lng')
-
+    lat = data.get('lat'); lng = data.get('lng')
     for alert in alerts:
         if alert['id'] == alert_id:
-            alert['lat']  = lat
-            alert['lng']  = lng
-            alert['time'] = datetime.utcnow().isoformat()
+            alert['lat'] = lat; alert['lng'] = lng
+            alert['time'] = utcnow().isoformat()
             alert['maps'] = f"https://maps.google.com/?q={lat},{lng}" if lat else alert['maps']
-            print(f"  Location updated: {alert_id} → {lat}, {lng}")
             break
-
     return jsonify({'status': 'updated'})
 
 
-# ── Battery low alert ─────────────────────────────────
+# ══════════════════════════════════════════════════════
+#   BATTERY LOW
+# ══════════════════════════════════════════════════════
 @app.route('/battery-low', methods=['POST'])
 def battery_low():
-    data  = request.get_json()
-    lat   = data.get('lat')
-    lng   = data.get('lng')
-    level = data.get('level', '?')
-    time  = data.get('time', datetime.utcnow().isoformat())
-    maps  = f"https://maps.google.com/?q={lat},{lng}" if lat else "GPS unavailable"
+    data     = request.get_json()
+    lat      = data.get('lat'); lng = data.get('lng')
+    level    = data.get('level', '?')
+    time_str = data.get('time', utcnow().isoformat())
+    maps     = f"https://maps.google.com/?q={lat},{lng}" if lat else "GPS unavailable"
+    alert_id = f"battery_{int(utcnow().timestamp())}"
+    track_link = f"{SERVER_BASE}/track/{alert_id}"
 
-    alert_id   = f"battery_{int(datetime.utcnow().timestamp())}"
-    protocol   = 'https' if IS_RENDER else 'http'
-    track_link = f"{protocol}://{SERVER_HOST}/track/{alert_id}"
-
-    alerts.append({
-        'id': alert_id, 'lat': lat, 'lng': lng,
-        'time': time, 'maps': maps, 'audio': False
-    })
-
-    print(f"\nBattery low alert! Level: {level}% | {maps}")
+    alerts.append({'id': alert_id, 'lat': lat, 'lng': lng, 'time': time_str,
+                   'maps': maps, 'audio': False})
+    print(f"\n🔋 Battery low: {level}% | {maps}")
 
     for contact in TRUSTED_CONTACTS:
-        send_email(
-            to_email = contact['email'],
-            subject  = f'🔋 Battery Low ({level}%) — SHEild Location Update',
-            body     = (
-                f"Battery Low Warning\n\n"
-                f"Battery level : {level}%\n"
-                f"Time          : {time}\n"
-                f"Last location : {maps}\n\n"
-                f"LIVE TRACKING LINK:\n{track_link}\n\n"
-                f"The phone battery is critically low.\n"
-                f"This may be the last location update.\n"
-                f"Please check on her immediately.\n\n"
-                f"— SHEild Safety System"
-            )
-        )
+        send_email(contact['email'],
+                   f'🔋 Battery Low ({level}%) — SHEild',
+                   f"Battery Low Warning\n\nLevel: {level}%\nTime: {time_str}\n"
+                   f"Location: {maps}\n\nTrack live:\n{track_link}\n\n"
+                   f"Please check immediately.\n\n— SHEild Safety System")
         if contact.get('phone'):
-            send_sms(to_phone=contact['phone'], body=f"SHEild: Battery low ({level}%)! Track: {track_link}")
+            send_sms(contact['phone'],
+                     f"⚠️ SHEild: Battery {level}%! Last location: {maps}")
 
     return jsonify({'status': 'battery alert sent', 'track': track_link})
 
 
-# ── Alert log API ─────────────────────────────────────
-@app.route('/alerts')
-def get_alerts():
-    return jsonify(alerts)
-
-
-# ── Main ──────────────────────────────────────────────
+# ══════════════════════════════════════════════════════
+#   MAIN
+# ══════════════════════════════════════════════════════
 if __name__ == '__main__':
     print("=" * 50)
     print("  SHEild — Women Safety System")
     print("=" * 50)
-    print(f"  Host      : {SERVER_HOST}")
-    print(f"  Render    : {IS_RENDER}")
-    print(f"  Evidence  : {EVIDENCE_DIR}")
+    print(f"  Host    : {SERVER_BASE}")
+    print(f"  Render  : {IS_RENDER}")
+    print(f"  Evidence: {EVIDENCE_DIR}")
     print("=" * 50)
-
-port = int(os.environ.get('PORT', 5000))
-app.run(host="0.0.0.0", port=port)
+    app.run(debug=False, host='0.0.0.0', port=SERVER_PORT)
