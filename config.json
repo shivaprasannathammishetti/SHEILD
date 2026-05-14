@@ -1,13 +1,13 @@
 {
   "contacts": [
     {
-      "name": "freind",
+      "name": "daddy",
       "email": "shivaprasannathammishetti@gmail.com",
       "phone": "8247386869"
     }
   ],
-  "pin": "5555",
-  "gesture": "key_s",
+  "pin": "7777",
+  "gesture": "voice",
   "from": "20",
   "to": "6"
 }

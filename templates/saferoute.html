@@ -195,7 +195,25 @@
     .pac-item { color:#fff!important; border-top:1px solid #2c2c2e!important; padding:8px 12px!important; }
     .pac-item:hover { background:#2c2c2e!important; }
     .pac-item-query { color:#fff!important; }
-  </style>
+  
+    /* ── BOTTOM NAVBAR ── */
+    .navbar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #1c1c1e; border-top: 1px solid #2c2c2e;
+      display: flex; justify-content: space-around; align-items: center;
+      padding: 8px 0 12px; z-index: 500;
+    }
+    .nav-item {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 3px; text-decoration: none; color: #666;
+      font-size: 10px; font-weight: 500; padding: 4px 12px;
+      border-radius: 10px; transition: color 0.15s;
+    }
+    .nav-item.active { color: #ff3b30; }
+    .nav-item:hover  { color: #fff; }
+    .nav-icon { font-size: 20px; }
+    body { padding-bottom: 70px; }
+</style>
 </head>
 <body>
 
@@ -586,5 +604,28 @@
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAP7__5xM64YmapiegQM6On7-rolHXr2Uo&libraries=places&callback=initMap" async defer></script>
 
+
+<nav class="navbar">
+  <a href="/" class="nav-item">
+    <span class="nav-icon">🔢</span>
+    <span>App</span>
+  </a>
+  <a href="/saferoute" class="nav-item active">
+    <span class="nav-icon">🗺</span>
+    <span>Safe Route</span>
+  </a>
+  <a href="/dashboard" class="nav-item">
+    <span class="nav-icon">📊</span>
+    <span>Dashboard</span>
+  </a>
+  <a href="/history" class="nav-item">
+    <span class="nav-icon">📋</span>
+    <span>History</span>
+  </a>
+  <a href="/setup" class="nav-item">
+    <span class="nav-icon">⚙️</span>
+    <span>Setup</span>
+  </a>
+</nav>
 </body>
 </html>

@@ -11,8 +11,8 @@ app = Flask(__name__)
 # ══════════════════════════════════════════════════════
 #   YOUR GMAIL CREDENTIALS
 # ══════════════════════════════════════════════════════
-YOUR_EMAIL    = "YOUR_EMAIL"
-YOUR_PASSWORD = "YOUR_APP_PASSWORD"
+YOUR_EMAIL    = os.environ.get('YOUR_EMAIL', 'thammishettishivaprasanna@gmail.com')
+YOUR_PASSWORD = os.environ.get('YOUR_PASSWORD', 'yxfzhltvgyvdoahz')
 # ══════════════════════════════════════════════════════
 #   YOUR NAME shown in alerts
 # ══════════════════════════════════════════════════════
@@ -31,9 +31,8 @@ def get_local_ip():
     except:
         return '127.0.0.1'
 
-SERVER_HOST = get_local_ip()
-SERVER_PORT = 5000
-
+SERVER_HOST = os.environ.get('RENDER_EXTERNAL_HOSTNAME', get_local_ip())
+SERVER_PORT = 443 if os.environ.get('RENDER_EXTERNAL_HOSTNAME') else 5000
 # ──────────────────────────────────────────────────────
 # Runtime state
 # ──────────────────────────────────────────────────────
@@ -238,7 +237,8 @@ def sos():
 
     maps_link  = f"https://maps.google.com/?q={lat},{lng}" if lat else "GPS unavailable"
     alert_id   = f"alert_{len(alerts)+1}_{int(datetime.utcnow().timestamp())}"
-    track_link = f"http://{SERVER_HOST}:{SERVER_PORT}/track/{alert_id}"
+    protocol   = 'https' if os.environ.get('RENDER_EXTERNAL_HOSTNAME') else 'http'
+    track_link = f"{protocol}://{SERVER_HOST}/track/{alert_id}"
 
     alert = {
         'id'    : alert_id,
@@ -387,7 +387,8 @@ def battery_low():
 
     # ── Create a real alert entry so live tracking works ──
     alert_id   = f"battery_{int(datetime.utcnow().timestamp())}"
-    track_link = f"http://{SERVER_HOST}:{SERVER_PORT}/track/{alert_id}"
+    protocol   = 'https' if os.environ.get('RENDER_EXTERNAL_HOSTNAME') else 'http'
+    track_link = f"{protocol}://{SERVER_HOST}/track/{alert_id}"
 
     alert = {
         'id'   : alert_id,
@@ -453,4 +454,5 @@ if __name__ == '__main__':
     print(f"  Live      : http://{SERVER_HOST}:{SERVER_PORT}/live")
     print(f"  SafeRoute : http://{SERVER_HOST}:{SERVER_PORT}/saferoute")
     print("=" * 50)
-app.run(host="0.0.0.0", port=5000)
+port = int(os.environ.get('PORT', 5000))
+app.run(host="0.0.0.0", port=port)
