@@ -340,7 +340,6 @@ def upload_audio():
 
     file_size = os.path.getsize(filename)
     print(f"\n🎙 Audio evidence saved: {filename} ({file_size} bytes)")
-    print(f"  File exists check: {os.path.exists(filename)}")
 
     # Mark alert as having audio
     for alert in alerts:
