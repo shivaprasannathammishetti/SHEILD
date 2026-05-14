@@ -68,40 +68,30 @@ load_config()
 # ── Helper: send email ────────────────────────────────
 def send_email(to_email, subject, body, attachment_path=None):
     try:
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
+        import requests as req
 
-        msg = MIMEMultipart()
-        msg['Subject'] = subject
-        msg['From']    = YOUR_EMAIL
-        msg['To']      = to_email
-        msg.attach(MIMEText(body, 'plain'))
+        response = req.post(
+            'https://api.brevo.com/v3/smtp/email',
+            headers={
+                'api-key' : os.environ.get('BREVO_API_KEY', ''),
+                'Content-Type': 'application/json'
+            },
+            json={
+                'sender'     : {'email': YOUR_EMAIL},
+                'to'         : [{'email': to_email}],
+                'subject'    : subject,
+                'textContent': body
+            },
+            timeout=10
+        )
 
-        if attachment_path and os.path.exists(attachment_path):
-            with open(attachment_path, 'rb') as f:
-                part = MIMEBase('audio', 'webm')
-                part.set_payload(f.read())
-                encoders.encode_base64(part)
-                fname = os.path.basename(attachment_path)
-                part.add_header('Content-Disposition',
-                                f'attachment; filename="{fname}"')
-                msg.attach(part)
+        if response.status_code == 201:
+            print(f"  Email sent to: {to_email}")
+            return True
+        else:
+            print(f"  Email failed: {response.status_code} — {response.text}")
+            return False
 
-        # Try port 587 (TLS) instead of 465 (SSL)
-        with smtplib.SMTP('smtp.gmail.com', 587) as smtp:
-            smtp.ehlo()
-            smtp.starttls()
-            smtp.ehlo()
-            smtp.login(YOUR_EMAIL, YOUR_PASSWORD)
-            smtp.send_message(msg)
-
-        print(f"  Email sent to: {to_email}")
-        return True
-
-    except smtplib.SMTPAuthenticationError:
-        print(f"  Gmail auth failed — check App Password")
-        return False
     except Exception as e:
         print(f"  Email error: {e}")
         return False
