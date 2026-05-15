@@ -327,8 +327,10 @@ def battery_low():
                    f"Location: {maps}\n\nTrack live:\n{track_link}\n\n"
                    f"Please check immediately.\n\n— SHEild Safety System")
     return jsonify({'status': 'battery alert sent', 'track': track_link})
-
-
+@app.route('/manifest.json')
+def manifest():
+    from flask import send_from_directory
+    return send_from_directory(BASE_DIR, 'manifest.json')
 # ── Main ──────────────────────────────────────────────
 if __name__ == '__main__':
     print("=" * 50)
