@@ -1,166 +1,108 @@
-from flask import Flask, render_template, request, jsonify
-import smtplib, os, json, socket, base64
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
-from datetime import datetime
+import requests as req
+from flask import Flask, render_template, request, jsonify, send_from_directory
+import os, json, socket, base64
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 
 # ══════════════════════════════════════════════════════
-#   YOUR GMAIL CREDENTIALS
+#   BREVO EMAIL API  (works on Render free plan)
+#   Gmail SMTP ports 465/587 are BLOCKED on Render free.
+#   Sign up free at https://app.brevo.com
+#   Top menu → SMTP & API → API Keys → Create key
+#   Add to Render env: BREVO_API_KEY = xkeysib-xxxxx
 # ══════════════════════════════════════════════════════
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
 YOUR_EMAIL    = os.environ.get('YOUR_EMAIL', 'thammishettishivaprasanna@gmail.com')
-YOUR_PASSWORD = os.environ.get('YOUR_PASSWORD', 'yxfzhltvgyvdoahz')
+YOUR_NAME     = "SHEild User"
 
 # ══════════════════════════════════════════════════════
-#   YOUR NAME shown in alerts
+#   HOST — auto-detects Render or local
 # ══════════════════════════════════════════════════════
-YOUR_NAME = "SHEild User"
+RENDER_HOST = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '')
+IS_RENDER   = bool(RENDER_HOST)
+SERVER_BASE = f"https://{RENDER_HOST}" if IS_RENDER else "http://localhost:5000"
+SERVER_PORT = int(os.environ.get('PORT', 5000))
 
-# ══════════════════════════════════════════════════════
-#   SERVER HOST — auto detect Render or local
-# ══════════════════════════════════════════════════════
-def get_local_ip():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except:
-        return '127.0.0.1'
-
-SERVER_HOST = os.environ.get('RENDER_EXTERNAL_HOSTNAME', get_local_ip())
-SERVER_PORT = 443 if os.environ.get('RENDER_EXTERNAL_HOSTNAME') else 5000
-IS_RENDER   = bool(os.environ.get('RENDER_EXTERNAL_HOSTNAME'))
-
-# ──────────────────────────────────────────────────────
-# Runtime state
-# ──────────────────────────────────────────────────────
-TRUSTED_CONTACTS = []
-CANCEL_PIN       = "1234"
-
-# Evidence folder — absolute path so it works on Render
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 EVIDENCE_DIR = os.path.join(BASE_DIR, 'evidence')
+CONFIG_PATH  = os.path.join(BASE_DIR, 'config.json')
 os.makedirs(EVIDENCE_DIR, exist_ok=True)
 
-alerts = []
+TRUSTED_CONTACTS = []
+CANCEL_PIN       = "1234"
+alerts           = []
 
 
-# ── Load saved config on startup ──────────────────────
+def utcnow():
+    return datetime.now(timezone.utc)
+
+
 def load_config():
     global TRUSTED_CONTACTS, CANCEL_PIN
-    config_path = os.path.join(BASE_DIR, 'config.json')
-    if os.path.exists(config_path):
-        with open(config_path) as f:
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH) as f:
             saved = json.load(f)
-            TRUSTED_CONTACTS = [
-                c for c in saved.get('contacts', [])
-                if c.get('email')
-            ]
-            CANCEL_PIN = saved.get('pin', '1234')
+        TRUSTED_CONTACTS = [c for c in saved.get('contacts', []) if c.get('email')]
+        CANCEL_PIN = saved.get('pin', '1234')
         print(f"\nConfig loaded:")
         for c in TRUSTED_CONTACTS:
-            print(f"  Contact : {c.get('name')} | {c.get('email')} | {c.get('phone','no phone')}")
-        print(f"  PIN     : {CANCEL_PIN}\n")
+            print(f"  {c.get('name')} | {c.get('email')} | {c.get('phone','no phone')}")
+        print(f"  PIN   : {CANCEL_PIN}")
+        print(f"  Host  : {SERVER_BASE}")
+        print(f"  Email : {'Brevo ready ✓' if BREVO_API_KEY else '✗ set BREVO_API_KEY in Render env'}\n")
     else:
-        print("\nNo config.json found — go to /setup first\n")
+        print("\nNo config.json — go to /setup first\n")
 
 load_config()
 
 
 # ══════════════════════════════════════════════════════
-#   SEND EMAIL
-#   Uses Brevo API — supports attachments via base64
+#   SEND EMAIL via Brevo HTTP API
+#   No attachments — sends download links instead
+#   (Brevo rejects .webm; links work better anyway)
 # ══════════════════════════════════════════════════════
-def send_email(to_email, subject, body, attachment_path=None):
+def send_email(to_email, subject, body):
+    if not BREVO_API_KEY:
+        print(f"  ✗ Email skipped — BREVO_API_KEY not set")
+        return False
     try:
-        import requests as req
-        print(f"  Attempting Brevo email to: {to_email}")
-
-        payload = {
-            'sender'     : {'email': YOUR_EMAIL},
-            'to'         : [{'email': to_email}],
-            'subject'    : subject,
-            'textContent': body
-        }
-
-        # ── Add attachment if file exists ──
-        if attachment_path and os.path.exists(attachment_path):
-            file_size = os.path.getsize(attachment_path)
-            print(f"  Attaching file: {attachment_path} ({file_size} bytes)")
-
-            with open(attachment_path, 'rb') as f:
-                file_data = f.read()
-
-            # Brevo requires base64 encoded attachment
-            encoded_data = base64.b64encode(file_data).decode('utf-8')
-            fname        = os.path.basename(attachment_path)
-
-            payload['attachment'] = [{
-                'content': encoded_data,
-                'name'   : fname
-            }]
-            print(f"  Attachment encoded: {len(encoded_data)} chars base64")
-        else:
-            if attachment_path:
-                print(f"  WARNING: Attachment file not found: {attachment_path}")
-
-        response = req.post(
+        r = req.post(
             'https://api.brevo.com/v3/smtp/email',
-            headers={
-                'api-key'     : os.environ.get('BREVO_API_KEY', ''),
-                'Content-Type': 'application/json'
+            headers={'api-key': BREVO_API_KEY, 'Content-Type': 'application/json'},
+            json={
+                'sender'     : {'name': 'SHEild Safety', 'email': YOUR_EMAIL},
+                'to'         : [{'email': to_email}],
+                'subject'    : subject,
+                'textContent': body
             },
-            json=payload,
             timeout=15
         )
-
-        if response.status_code == 201:
-            print(f"  ✓ Email sent to: {to_email}")
+        if r.status_code == 201:
+            print(f"  ✓ Email → {to_email}")
             return True
         else:
-            print(f"  ✗ Email failed: {response.status_code} — {response.text[:200]}")
+            print(f"  ✗ Email failed {r.status_code}: {r.text[:150]}")
             return False
-
     except Exception as e:
         print(f"  ✗ Email error: {e}")
         return False
 
 
 # ══════════════════════════════════════════════════════
-#   SEND SMS via SMS Gateway app
+#   SMS — handled FREE on the client (browser)
+#
+#   The index.html already calls sendNativeSMS() which
+#   uses the Android/iOS  sms:  URL scheme to open the
+#   phone's built-in SMS app with a pre-filled message.
+#   This is 100% free, works offline, needs no API key.
+#
+#   This server function is a no-op kept so existing
+#   call-sites don't crash.
 # ══════════════════════════════════════════════════════
 def send_sms(to_phone, body):
-    phone = to_phone.strip().replace(' ', '').replace('-', '')
-    if not phone:
-        print(f"  SMS skipped — no phone number")
-        return False
-
-    phone = phone[-10:]
-
-    try:
-        import requests as req
-        SMS_GATEWAY_URL = os.environ.get('SMS_GATEWAY_URL', 'https://skimmed-upchuck-document.ngrok-free.dev/send-sms')
-        response = req.post(
-            SMS_GATEWAY_URL,
-            json={'phone': phone, 'message': body},
-            timeout=40
-        )
-
-        if response.status_code == 200:
-            print(f"  ✓ SMS sent to: {phone}")
-            return True
-        else:
-            print(f"  ✗ SMS failed: {response.status_code}")
-            return False
-
-    except Exception as e:
-        print(f"  ✗ SMS error: {e}")
-        return False
+    print(f"  SMS: sent via browser native SMS (free, no API needed)")
+    return True
 
 
 # ── Pages ─────────────────────────────────────────────
@@ -188,8 +130,6 @@ def history():
 def saferoute():
     return render_template('saferoute.html')
 
-
-# ── Live tracking ─────────────────────────────────────
 @app.route('/track/<alert_id>')
 def track(alert_id):
     alert = next((a for a in alerts if a['id'] == alert_id), None)
@@ -199,266 +139,201 @@ def track(alert_id):
 def track_data(alert_id):
     alert = next((a for a in alerts if a['id'] == alert_id), None)
     if alert:
-        return jsonify({
-            'lat'  : alert.get('lat'),
-            'lng'  : alert.get('lng'),
-            'time' : alert.get('time'),
-            'maps' : alert.get('maps'),
-            'audio': alert.get('audio', False)
-        })
+        return jsonify({'lat': alert.get('lat'), 'lng': alert.get('lng'),
+                        'time': alert.get('time'), 'maps': alert.get('maps'),
+                        'audio': alert.get('audio', False)})
     return jsonify({}), 404
 
-
-# ── Save setup config ─────────────────────────────────
-@app.route('/setup', methods=['POST'])
-def save_setup():
-    global TRUSTED_CONTACTS, CANCEL_PIN
-
-    data = request.get_json()
-    print(f"\nSetup received: {data}")
-
-    TRUSTED_CONTACTS = [
-        c for c in data.get('contacts', [])
-        if c.get('email') and c['email'].strip()
-    ]
-    CANCEL_PIN = data.get('pin', '1234')
-
-    config_path = os.path.join(BASE_DIR, 'config.json')
-    with open(config_path, 'w') as f:
-        json.dump({
-            'contacts' : data.get('contacts', []),
-            'pin'      : CANCEL_PIN,
-            'gesture'  : data.get('gesture', 'key_s'),
-            'from'     : data.get('from', '20'),
-            'to'       : data.get('to', '6')
-        }, f, indent=2)
-
-    print(f"Setup saved — contacts: {[c.get('email') for c in TRUSTED_CONTACTS]}")
-
-    for contact in TRUSTED_CONTACTS:
-        send_email(
-            to_email = contact['email'],
-            subject  = 'SHEild — You are now a trusted contact',
-            body     = (
-                f"Hello {contact.get('name', '')},\n\n"
-                f"You have been added as a trusted emergency contact on SHEild.\n\n"
-                f"If this person triggers an SOS alert, you will receive an automatic "
-                f"emergency email with their live GPS location.\n\n"
-                f"Please respond immediately if you receive an SOS alert.\n\n"
-                f"— SHEild Safety System"
-            )
-        )
-
-    return jsonify({
-        'status'   : 'saved',
-        'contacts' : [c['email'] for c in TRUSTED_CONTACTS],
-        'pin'      : CANCEL_PIN
-    })
-
-
-# ── Receive SOS alert ─────────────────────────────────
-@app.route('/sos', methods=['POST'])
-def sos():
-    data = request.get_json()
-    lat  = data.get('lat')
-    lng  = data.get('lng')
-    time = data.get('time', datetime.utcnow().isoformat())
-
-    maps_link  = f"https://maps.google.com/?q={lat},{lng}" if lat else "GPS unavailable"
-    alert_id   = f"alert_{len(alerts)+1}_{int(datetime.utcnow().timestamp())}"
-    protocol   = 'https' if IS_RENDER else 'http'
-    track_link = f"{protocol}://{SERVER_HOST}/track/{alert_id}"
-
-    alert = {
-        'id'    : alert_id,
-        'lat'   : lat,
-        'lng'   : lng,
-        'time'  : time,
-        'maps'  : maps_link,
-        'audio' : False
-    }
-    alerts.append(alert)
-
-    print(f"\nSOS received!")
-    print(f"  Alert ID   : {alert_id}")
-    print(f"  Location   : {maps_link}")
-    print(f"  Live track : {track_link}")
-    print(f"  Contacts   : {[c.get('email') for c in TRUSTED_CONTACTS]}")
-
-    if not TRUSTED_CONTACTS:
-        print("  WARNING: No trusted contacts configured!")
-        return jsonify({
-            'status'   : 'SOS received but no contacts configured',
-            'alert_id' : alert_id,
-            'maps'     : maps_link
-        })
-
-    email_body = (
-        f"🚨 SOS ALERT — {YOUR_NAME} needs help!\n\n"
-        f"Time     : {time}\n"
-        f"Location : {maps_link}\n\n"
-        f"LIVE TRACKING LINK (updates every 10s):\n"
-        f"{track_link}\n\n"
-        f"Open on Google Maps: {maps_link}\n\n"
-        f"This is an automatic emergency alert from SHEild.\n"
-        f"Please respond immediately.\n\n"
-        f"Alert ID : {alert_id}"
-    )
-
-    sms_body = (
-        f"SOS! {YOUR_NAME} needs help NOW!\n"
-        f"Location: {maps_link}\nTrack: {track_link}"
-        if lat else
-        f"SOS! {YOUR_NAME} needs help NOW!\nGPS unavailable. Call immediately!"
-    )
-
-    for contact in TRUSTED_CONTACTS:
-        send_email(to_email=contact['email'], subject='🚨 SOS - Emergency Alert from SHEild', body=email_body)
-        if contact.get('phone'):
-            send_sms(to_phone=contact['phone'], body=sms_body)
-
-    return jsonify({
-        'status'   : 'SOS sent',
-        'alert_id' : alert_id,
-        'maps'     : maps_link,
-        'track'    : track_link
-    })
-
-
-# ── Receive audio evidence ────────────────────────────
-@app.route('/upload-audio', methods=['POST'])
-def upload_audio():
-    if 'audio' not in request.files:
-        return jsonify({'status': 'no audio file'}), 400
-
-    audio_file = request.files['audio']
-    alert_id   = request.form.get('alert_id', 'unknown')
-
-    # ── Save to absolute path ──
-    filename = os.path.join(EVIDENCE_DIR, f"{alert_id}.webm")
-    audio_file.save(filename)
-
-    file_size = os.path.getsize(filename)
-    print(f"\n🎙 Audio evidence saved: {filename} ({file_size} bytes)")
-    print(f"  File exists check: {os.path.exists(filename)}")
-
-    # Mark alert as having audio
-    for alert in alerts:
-        if alert['id'] == alert_id:
-            alert['audio']      = True
-            alert['audio_file'] = filename
-            break
-
-    # ── Send audio as email attachment via Brevo base64 ──
-    for contact in TRUSTED_CONTACTS:
-        success = send_email(
-            to_email        = contact['email'],
-            subject         = '🎙 Audio Evidence — SHEild SOS Recording',
-            body            = (
-                f"Audio evidence recording is attached to this email.\n\n"
-                f"Alert ID  : {alert_id}\n"
-                f"Recorded  : {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
-                f"File size : {file_size} bytes\n\n"
-                f"This 30-second recording was captured silently during the SOS alert.\n"
-                f"Open the attached .webm file with any media player (VLC, Chrome, etc).\n\n"
-                f"Keep this as evidence.\n\n"
-                f"— SHEild Safety System"
-            ),
-            attachment_path = filename   # ← now works with Brevo base64
-        )
-        if success:
-            print(f"  ✓ Audio email with attachment sent to: {contact['email']}")
-        else:
-            print(f"  ✗ Audio email failed for: {contact['email']}")
-
-    return jsonify({'status': 'audio saved', 'file': filename, 'size': file_size})
-
-
-# ── Serve audio evidence files ────────────────────────
-@app.route('/evidence/<filename>')
-def serve_evidence(filename):
-    from flask import send_from_directory
-    return send_from_directory(EVIDENCE_DIR, filename)
-
-
-# ── Update location ───────────────────────────────────
-@app.route('/update-location', methods=['POST'])
-def update_location():
-    data     = request.get_json()
-    alert_id = data.get('alert_id')
-    lat      = data.get('lat')
-    lng      = data.get('lng')
-
-    for alert in alerts:
-        if alert['id'] == alert_id:
-            alert['lat']  = lat
-            alert['lng']  = lng
-            alert['time'] = datetime.utcnow().isoformat()
-            alert['maps'] = f"https://maps.google.com/?q={lat},{lng}" if lat else alert['maps']
-            print(f"  Location updated: {alert_id} → {lat}, {lng}")
-            break
-
-    return jsonify({'status': 'updated'})
-
-
-# ── Battery low alert ─────────────────────────────────
-@app.route('/battery-low', methods=['POST'])
-def battery_low():
-    data  = request.get_json()
-    lat   = data.get('lat')
-    lng   = data.get('lng')
-    level = data.get('level', '?')
-    time  = data.get('time', datetime.utcnow().isoformat())
-    maps  = f"https://maps.google.com/?q={lat},{lng}" if lat else "GPS unavailable"
-
-    alert_id   = f"battery_{int(datetime.utcnow().timestamp())}"
-    protocol   = 'https' if IS_RENDER else 'http'
-    track_link = f"{protocol}://{SERVER_HOST}/track/{alert_id}"
-
-    alerts.append({
-        'id': alert_id, 'lat': lat, 'lng': lng,
-        'time': time, 'maps': maps, 'audio': False
-    })
-
-    print(f"\nBattery low alert! Level: {level}% | {maps}")
-
-    for contact in TRUSTED_CONTACTS:
-        send_email(
-            to_email = contact['email'],
-            subject  = f'🔋 Battery Low ({level}%) — SHEild Location Update',
-            body     = (
-                f"Battery Low Warning\n\n"
-                f"Battery level : {level}%\n"
-                f"Time          : {time}\n"
-                f"Last location : {maps}\n\n"
-                f"LIVE TRACKING LINK:\n{track_link}\n\n"
-                f"The phone battery is critically low.\n"
-                f"This may be the last location update.\n"
-                f"Please check on her immediately.\n\n"
-                f"— SHEild Safety System"
-            )
-        )
-        if contact.get('phone'):
-            send_sms(to_phone=contact['phone'], body=f"SHEild: Battery low ({level}%)! Track: {track_link}")
-
-    return jsonify({'status': 'battery alert sent', 'track': track_link})
-
-
-# ── Alert log API ─────────────────────────────────────
 @app.route('/alerts')
 def get_alerts():
     return jsonify(alerts)
+
+@app.route('/evidence/<filename>')
+def serve_evidence(filename):
+    return send_from_directory(EVIDENCE_DIR, filename)
+
+
+# ── Setup ─────────────────────────────────────────────
+@app.route('/setup', methods=['POST'])
+def save_setup():
+    global TRUSTED_CONTACTS, CANCEL_PIN
+    data = request.get_json()
+    TRUSTED_CONTACTS = [c for c in data.get('contacts', [])
+                        if c.get('email') and c['email'].strip()]
+    CANCEL_PIN = data.get('pin', '1234')
+
+    with open(CONFIG_PATH, 'w') as f:
+        json.dump({'contacts': data.get('contacts', []), 'pin': CANCEL_PIN,
+                   'gesture': data.get('gesture', 'key_s'),
+                   'from': data.get('from', '20'), 'to': data.get('to', '6')}, f, indent=2)
+
+    print(f"\nSetup saved — {[c.get('email') for c in TRUSTED_CONTACTS]}")
+
+    for contact in TRUSTED_CONTACTS:
+        send_email(
+            contact['email'],
+            'SHEild — You are now a trusted contact',
+            f"Hello {contact.get('name', '')},\n\n"
+            f"You have been added as a trusted emergency contact on SHEild.\n\n"
+            f"If an SOS is triggered you will receive an immediate email with a live GPS link.\n\n"
+            f"Please respond immediately if you receive an SOS alert.\n\n"
+            f"— SHEild Safety System"
+        )
+
+    return jsonify({'status': 'saved',
+                    'contacts': [c['email'] for c in TRUSTED_CONTACTS],
+                    'pin': CANCEL_PIN})
+
+
+# ── SOS ───────────────────────────────────────────────
+@app.route('/sos', methods=['POST'])
+def sos():
+    data       = request.get_json()
+    lat        = data.get('lat')
+    lng        = data.get('lng')
+    time_str   = data.get('time', utcnow().isoformat())
+    maps_link  = f"https://maps.google.com/?q={lat},{lng}" if lat else "GPS unavailable"
+    alert_id   = f"alert_{len(alerts)+1}_{int(utcnow().timestamp())}"
+    track_link = f"{SERVER_BASE}/track/{alert_id}"
+
+    alerts.append({'id': alert_id, 'lat': lat, 'lng': lng, 'time': time_str,
+                   'maps': maps_link, 'audio': False})
+
+    print(f"\n🚨 SOS! ID={alert_id}")
+    print(f"  Location  : {maps_link}")
+    print(f"  Track     : {track_link}")
+
+    if not TRUSTED_CONTACTS:
+        print("  WARNING: No trusted contacts!")
+        return jsonify({'status': 'no contacts', 'alert_id': alert_id})
+
+    email_body = (
+        f"🚨 SOS ALERT — {YOUR_NAME} needs help!\n\n"
+        f"Time     : {time_str}\n"
+        f"Location : {maps_link}\n\n"
+        f"▶ LIVE TRACKING (updates every 10s):\n{track_link}\n\n"
+        f"▶ Google Maps: {maps_link}\n\n"
+        f"Please respond immediately.\n\nAlert ID: {alert_id}"
+    )
+
+    for contact in TRUSTED_CONTACTS:
+        send_email(contact['email'], '🚨 SOS - Emergency Alert from SHEild', email_body)
+        # Native SMS is fired from browser (index.html → sendNativeSMS)
+
+    return jsonify({'status': 'SOS sent', 'alert_id': alert_id,
+                    'maps': maps_link, 'track': track_link})
+
+
+# ══════════════════════════════════════════════════════
+#   AUDIO EVIDENCE
+#   Saves file, emails a clickable DOWNLOAD LINK.
+#   Brevo rejects .webm attachments → link is better.
+# ══════════════════════════════════════════════════════
+@app.route('/upload-audio', methods=['POST'])
+def upload_audio():
+    try:
+        if 'audio' not in request.files:
+            return jsonify({'status': 'no audio file'}), 400
+
+        audio_file = request.files['audio']
+        alert_id   = request.form.get('alert_id', 'unknown')
+        fname      = f"{alert_id}.webm"
+        save_path  = os.path.join(EVIDENCE_DIR, fname)
+        audio_file.save(save_path)
+        file_size  = os.path.getsize(save_path)
+
+        print(f"\n🎙 Audio saved: {fname} ({file_size} bytes)")
+
+        for alert in alerts:
+            if alert['id'] == alert_id:
+                alert['audio'] = True
+                alert['audio_file'] = save_path
+                break
+
+        # Public link — contact clicks to listen/download
+        audio_link = f"{SERVER_BASE}/evidence/{fname}"
+        print(f"  Link: {audio_link}")
+
+        for contact in TRUSTED_CONTACTS:
+            ok = send_email(
+                contact['email'],
+                '🎙 Audio Evidence — SHEild SOS Recording',
+                f"Audio evidence was recorded during the SOS alert.\n\n"
+                f"Alert ID  : {alert_id}\n"
+                f"Recorded  : {utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+                f"File size : {file_size} bytes\n\n"
+                f"▶ LISTEN / DOWNLOAD:\n"
+                f"{audio_link}\n\n"
+                f"Click the link to play or download the recording.\n"
+                f"Works in Chrome, Firefox, VLC.\n\n"
+                f"— SHEild Safety System"
+            )
+            print(f"  {'✓' if ok else '✗'} Audio email → {contact['email']}")
+
+        return jsonify({'status': 'audio saved', 'link': audio_link})
+
+    except Exception as e:
+        print(f"  ✗ upload_audio error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ── Continuous location update ────────────────────────
+@app.route('/update-location', methods=['POST'])
+def update_location():
+    data = request.get_json()
+    for alert in alerts:
+        if alert['id'] == data.get('alert_id'):
+            alert['lat']  = data.get('lat')
+            alert['lng']  = data.get('lng')
+            alert['time'] = utcnow().isoformat()
+            if data.get('lat'):
+                alert['maps'] = f"https://maps.google.com/?q={data['lat']},{data['lng']}"
+            break
+    return jsonify({'status': 'updated'})
+
+
+# ── Late GPS follow-up ────────────────────────────────
+@app.route('/sos-update', methods=['POST'])
+def sos_update():
+    data = request.get_json()
+    lat  = data.get('lat'); lng = data.get('lng')
+    if not lat or not lng:
+        return jsonify({'status': 'no GPS'}), 400
+    maps_link = f"https://maps.google.com/?q={lat},{lng}"
+    for alert in alerts:
+        if alert['id'] == data.get('alert_id'):
+            alert['lat'] = lat; alert['lng'] = lng; alert['maps'] = maps_link
+            break
+    print(f"  📍 GPS follow-up: {maps_link}")
+    return jsonify({'status': 'updated', 'maps': maps_link})
+
+
+# ── Battery low ───────────────────────────────────────
+@app.route('/battery-low', methods=['POST'])
+def battery_low():
+    data     = request.get_json()
+    lat      = data.get('lat'); lng = data.get('lng')
+    level    = data.get('level', '?')
+    time_str = data.get('time', utcnow().isoformat())
+    maps     = f"https://maps.google.com/?q={lat},{lng}" if lat else "GPS unavailable"
+    alert_id = f"battery_{int(utcnow().timestamp())}"
+    track_link = f"{SERVER_BASE}/track/{alert_id}"
+    alerts.append({'id': alert_id, 'lat': lat, 'lng': lng,
+                   'time': time_str, 'maps': maps, 'audio': False})
+    print(f"\n🔋 Battery low: {level}%")
+    for contact in TRUSTED_CONTACTS:
+        send_email(contact['email'], f'🔋 Battery Low ({level}%) — SHEild',
+                   f"Battery Low Warning\n\nLevel: {level}%\nTime: {time_str}\n"
+                   f"Location: {maps}\n\nTrack live:\n{track_link}\n\n"
+                   f"Please check immediately.\n\n— SHEild Safety System")
+    return jsonify({'status': 'battery alert sent', 'track': track_link})
 
 
 # ── Main ──────────────────────────────────────────────
 if __name__ == '__main__':
     print("=" * 50)
     print("  SHEild — Women Safety System")
+    print(f"  Host    : {SERVER_BASE}")
+    print(f"  Render  : {IS_RENDER}")
     print("=" * 50)
-    print(f"  Host      : {SERVER_HOST}")
-    print(f"  Render    : {IS_RENDER}")
-    print(f"  Evidence  : {EVIDENCE_DIR}")
-    print("=" * 50)
-
-port = int(os.environ.get('PORT', 5000))
-app.run(host="0.0.0.0", port=port)
+    app.run(debug=False, host='0.0.0.0', port=SERVER_PORT)

@@ -5,319 +5,207 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Calculator</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
+    * { margin:0; padding:0; box-sizing:border-box; }
     body {
-      background: #1c1c1e;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background:#1c1c1e;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      min-height:100vh;
+      font-family:-apple-system,BlinkMacSystemFont,sans-serif;
     }
-
     .calculator {
-      background: #1c1c1e;
-      border-radius: 40px;
-      padding: 24px;
-      width: 320px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      background:#1c1c1e;
+      border-radius:40px;
+      padding:24px;
+      width:320px;
+      box-shadow:0 20px 60px rgba(0,0,0,0.6);
     }
-
     .display {
-      background: #1c1c1e;
-      border-radius: 16px;
-      padding: 20px 16px 10px;
-      text-align: right;
-      margin-bottom: 12px;
+      background:#1c1c1e;
+      border-radius:16px;
+      padding:20px 16px 10px;
+      text-align:right;
+      margin-bottom:12px;
     }
-
-    .display .expression {
-      font-size: 18px;
-      color: #888;
-      min-height: 24px;
-      margin-bottom: 4px;
-    }
-
-    .display .result {
-      font-size: 56px;
-      font-weight: 200;
-      color: #fff;
-      letter-spacing: -2px;
-    }
-
-    .buttons {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-    }
-
+    .display .expression { font-size:18px; color:#888; min-height:24px; margin-bottom:4px; }
+    .display .result { font-size:56px; font-weight:200; color:#fff; letter-spacing:-2px; }
+    .buttons { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
     .btn {
-      border: none;
-      border-radius: 50%;
-      width: 64px;
-      height: 64px;
-      font-size: 22px;
-      font-weight: 400;
-      cursor: pointer;
-      transition: opacity 0.1s;
-      outline: none;
+      border:none; border-radius:50%;
+      width:64px; height:64px;
+      font-size:22px; font-weight:400;
+      cursor:pointer; transition:opacity 0.1s; outline:none;
+    }
+    .btn:active  { opacity:0.6; }
+    .btn-gray    { background:#a5a5a5; color:#000; }
+    .btn-dark    { background:#333335; color:#fff; }
+    .btn-orange  { background:#ff9f0a; color:#fff; }
+    .btn-zero    {
+      width:100%; border-radius:32px;
+      text-align:left; padding-left:24px;
+      grid-column:span 2;
     }
 
-    .btn:active { opacity: 0.6; }
-
-    .btn-gray   { background: #a5a5a5; color: #000; }
-    .btn-dark   { background: #333335; color: #fff; }
-    .btn-orange { background: #ff9f0a; color: #fff; }
-    .btn-zero   { width: 100%; border-radius: 32px; text-align: left; padding-left: 24px; grid-column: span 2; }
-
-    /* SOS DOT */
+    /* SOS dot */
     #sos-dot {
-      position: fixed;
-      top: 14px;
-      right: 14px;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: red;
-      display: none;
-      animation: pulse 1s infinite;
-      z-index: 999;
+      position:fixed; top:14px; right:14px;
+      width:8px; height:8px; border-radius:50%;
+      background:red; display:none;
+      animation:blink 1s infinite; z-index:999;
     }
-
-    @keyframes pulse {
-      0%,100% { opacity: 1; transform: scale(1); }
-      50%      { opacity: 0.3; transform: scale(0.7); }
+    @keyframes blink {
+      0%,100%{opacity:1;transform:scale(1);}
+      50%{opacity:0.3;transform:scale(0.7);}
     }
 
     /* 10-second cancel overlay */
     #sos-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.88);
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      gap: 16px;
-      z-index: 1000;
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.88);
+      justify-content:center; align-items:center;
+      flex-direction:column; gap:16px; z-index:1000;
     }
-
-    #sos-overlay h2   { color: #ff3b30; font-size: 28px; }
-    #sos-overlay p    { color: #fff; font-size: 15px; text-align: center; }
-    #countdown-text   { color: #ff9f0a; font-size: 48px; font-weight: 200; }
-
+    #sos-overlay h2  { color:#ff3b30; font-size:28px; }
+    #sos-overlay p   { color:#fff; font-size:15px; text-align:center; }
+    #countdown-text  { color:#ff9f0a; font-size:64px; font-weight:200; }
     #cancel-btn {
-      background: #333;
-      color: #fff;
-      border: none;
-      padding: 12px 32px;
-      border-radius: 24px;
-      font-size: 16px;
-      cursor: pointer;
-      margin-top: 8px;
+      background:#333; color:#fff; border:none;
+      padding:12px 32px; border-radius:24px;
+      font-size:16px; cursor:pointer; margin-top:8px;
     }
-
     #pin-input {
-      background: #222;
-      border: 1px solid #444;
-      color: #fff;
-      padding: 10px 16px;
-      border-radius: 12px;
-      font-size: 20px;
-      text-align: center;
-      width: 160px;
-      letter-spacing: 6px;
+      background:#222; border:1px solid #444; color:#fff;
+      padding:10px 16px; border-radius:12px;
+      font-size:24px; text-align:center;
+      width:160px; letter-spacing:8px;
     }
 
-    /* ── FAKE INCOMING CALL SCREEN ── */
+    /* Fake incoming call screen */
     #fake-call {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: #000;
-      z-index: 2000;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-between;
-      padding: 60px 40px 50px;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      display:none; position:fixed; inset:0;
+      background:linear-gradient(180deg,#1a1a2e 0%,#16213e 100%);
+      flex-direction:column; align-items:center;
+      justify-content:space-between;
+      padding:60px 40px 80px; z-index:2000;
+    }
+    .call-status { color:#aaa; font-size:16px; letter-spacing:0.05em; margin-bottom:8px; }
+    .call-name   { color:#fff; font-size:36px; font-weight:300; margin-bottom:6px; letter-spacing:-0.5px; }
+    .call-info   { color:#888; font-size:14px; }
+    .call-avatar {
+      width:100px; height:100px; border-radius:50%;
+      background:linear-gradient(135deg,#667eea,#764ba2);
+      display:flex; align-items:center; justify-content:center;
+      font-size:40px; margin:20px auto;
+      box-shadow:0 0 0 12px rgba(102,126,234,0.15);
+    }
+    .call-actions { display:flex; justify-content:space-around; width:100%; }
+    .call-btn {
+      width:72px; height:72px; border-radius:50%; border:none;
+      font-size:28px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .call-decline { background:#ff3b30; }
+    .call-accept  { background:#30d158; animation:callpulse 1.5s infinite; }
+    @keyframes callpulse {
+      0%,100%{ box-shadow:0 0 0 0 rgba(48,209,88,0.4); }
+      50%    { box-shadow:0 0 0 20px rgba(48,209,88,0); }
     }
 
-    .call-top { text-align: center; margin-top: 20px; }
-
-    .call-name {
-      font-size: 34px;
-      font-weight: 300;
-      color: #fff;
-      margin-bottom: 6px;
-      letter-spacing: -0.5px;
-    }
-
-    .call-label { font-size: 14px; color: rgba(255,255,255,0.55); margin-bottom: 4px; }
-    #call-timer { font-size: 14px; color: rgba(255,255,255,0.45); }
-
-    .call-actions {
-      display: flex;
-      justify-content: space-around;
-      width: 100%;
-      margin-bottom: 16px;
-    }
-
-    .call-action { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-
-    .call-action-btn {
-      width: 64px; height: 64px; border-radius: 50%;
-      background: rgba(255,255,255,0.12);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 26px; cursor: pointer; border: none;
-    }
-
-    .call-action-label { color: rgba(255,255,255,0.6); font-size: 12px; }
-
-    .call-buttons { display: flex; justify-content: space-around; align-items: center; width: 100%; }
-
-    .btn-decline {
-      width: 76px; height: 76px; border-radius: 50%;
-      background: #ff3b30; display: flex; align-items: center;
-      justify-content: center; font-size: 32px; cursor: pointer;
-      border: none; transform: rotate(135deg);
-    }
-
-    .btn-decline-label, .btn-accept-label {
-      font-size: 12px; color: rgba(255,255,255,0.55);
-      text-align: center; margin-top: 6px;
-    }
-
-    .btn-accept {
-      width: 76px; height: 76px; border-radius: 50%;
-      background: #30d158; display: flex; align-items: center;
-      justify-content: center; font-size: 32px; cursor: pointer; border: none;
-    }
-
-    .call-btn-wrap { display: flex; flex-direction: column; align-items: center; }
-
-    .call-ring { position: relative; width: 110px; margin: 0 auto 20px; }
-
-    .call-ring::before, .call-ring::after {
-      content: ''; position: absolute; inset: -12px; border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.15);
-      animation: ring-pulse 2s ease-out infinite;
-    }
-
-    .call-ring::after { inset: -24px; animation-delay: 0.5s; }
-
-    @keyframes ring-pulse {
-      0%   { opacity: 1; transform: scale(0.85); }
-      100% { opacity: 0; transform: scale(1.1); }
-    }
-
-    .call-ring-avatar {
-      width: 110px; height: 110px; border-radius: 50%;
-      background: linear-gradient(135deg, #3a3a3c, #555);
-      display: flex; align-items: center; justify-content: center; font-size: 52px;
+    /* Battery warning */
+    #battery-warning {
+      display:none; position:fixed; bottom:20px; left:50%;
+      transform:translateX(-50%);
+      background:#ff9f0a; color:#000;
+      padding:10px 20px; border-radius:20px;
+      font-size:13px; font-weight:500;
+      z-index:3000; white-space:nowrap;
     }
 
     /* ── BOTTOM NAVBAR ── */
     .navbar {
       position: fixed; bottom: 0; left: 0; right: 0;
-      background: #1c1c1e; border-top: 1px solid #2c2c2e;
+      background: #1c1c1e;
+      border-top: 1px solid #2c2c2e;
       display: flex; justify-content: space-around; align-items: center;
-      padding: 8px 0 12px; z-index: 500;
+      padding: 10px 0 18px; z-index: 500;
     }
     .nav-item {
       display: flex; flex-direction: column; align-items: center;
-      gap: 3px; text-decoration: none; color: #666;
-      font-size: 10px; font-weight: 500; padding: 4px 12px;
-      border-radius: 10px; transition: color 0.15s;
+      gap: 4px; text-decoration: none; color: #555;
+      font-size: 10px; font-weight: 500;
+      min-width: 56px; padding: 4px 0;
+      transition: color 0.15s;
     }
     .nav-item.active { color: #ff3b30; }
-    .nav-item:hover  { color: #fff; }
-    .nav-icon { font-size: 20px; }
-    body { padding-bottom: 70px; }
+    .nav-item svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .nav-item.active svg { stroke: #ff3b30; }
+    body { padding-bottom: 75px; }
   </style>
 </head>
 <body>
 
-<!-- Tiny red dot during countdown -->
+<!-- Tiny SOS dot -->
 <div id="sos-dot"></div>
+
+<!-- Battery warning toast -->
+<div id="battery-warning">Battery low — location sent to contacts</div>
 
 <!-- 10-second cancel overlay -->
 <div id="sos-overlay">
-  <h2>⚠ SOS Activating</h2>
+  <h2>SOS Activating</h2>
   <div id="countdown-text">10</div>
   <p>Enter your cancel PIN to stop</p>
-  <input type="password" id="pin-input" maxlength="4" placeholder="••••" oninput="checkPin(this.value)" />
+  <input type="password" id="pin-input" maxlength="4"
+         placeholder="****" oninput="checkPin(this.value)" autocomplete="off"/>
   <button id="cancel-btn" onclick="cancelSOS()">Cancel SOS</button>
-  <p style="color:#888;font-size:13px">If you do nothing, SOS fires automatically</p>
+  <p style="color:#666;font-size:13px">If you do nothing, SOS fires automatically</p>
 </div>
 
-<!-- ── FAKE INCOMING CALL SCREEN ── -->
+<!-- Fake incoming call screen -->
 <div id="fake-call">
-  <div class="call-top">
-    <div class="call-ring">
-      <div class="call-ring-avatar">👩</div>
-    </div>
+  <div style="text-align:center">
+    <div class="call-status">incoming call</div>
+    <div class="call-avatar">👩</div>
     <div class="call-name" id="call-contact-name">Mom</div>
-    <div class="call-label">mobile</div>
-    <div id="call-timer">calling...</div>
+    <div class="call-info">mobile</div>
   </div>
-
-  <div style="width:100%">
-    <div class="call-actions" style="margin-bottom:40px">
-      <div class="call-action">
-        <button class="call-action-btn">🔇</button>
-        <span class="call-action-label">mute</span>
-      </div>
-      <div class="call-action">
-        <button class="call-action-btn">⌨️</button>
-        <span class="call-action-label">keypad</span>
-      </div>
-      <div class="call-action">
-        <button class="call-action-btn">🔊</button>
-        <span class="call-action-label">speaker</span>
-      </div>
-      <div class="call-action">
-        <button class="call-action-btn">➕</button>
-        <span class="call-action-label">add call</span>
-      </div>
+  <div style="text-align:center;color:#888;font-size:13px">
+    Swipe up to answer
+  </div>
+  <div class="call-actions">
+    <div style="text-align:center">
+      <button class="call-btn call-decline" onclick="dismissFakeCall()">&#128245;</button>
+      <div style="color:#fff;font-size:12px;margin-top:8px">Decline</div>
     </div>
-
-    <div class="call-buttons">
-      <div class="call-btn-wrap">
-        <button class="btn-decline" onclick="dismissFakeCall()">📞</button>
-        <div class="btn-decline-label">Decline</div>
-      </div>
-      <div class="call-btn-wrap">
-        <button class="btn-accept" onclick="dismissFakeCall()">📞</button>
-        <div class="btn-accept-label">Accept</div>
-      </div>
+    <div style="text-align:center">
+      <button class="call-btn call-accept" onclick="dismissFakeCall()">&#128222;</button>
+      <div style="color:#fff;font-size:12px;margin-top:8px">Accept</div>
     </div>
   </div>
 </div>
 
-<!-- Calculator UI -->
+<!-- Calculator -->
 <div class="calculator">
   <div class="display">
     <div class="expression" id="expression"></div>
-    <div class="result"     id="result">0</div>
+    <div class="result" id="result">0</div>
   </div>
-
   <div class="buttons">
     <button class="btn btn-gray"   onclick="clear_all()">AC</button>
     <button class="btn btn-gray"   onclick="toggleSign()">+/-</button>
     <button class="btn btn-gray"   onclick="percent()">%</button>
-    <button class="btn btn-orange" onclick="setOp('/')">÷</button>
+    <button class="btn btn-orange" onclick="setOp('/')">&#247;</button>
 
     <button class="btn btn-dark"   onclick="input('7')">7</button>
     <button class="btn btn-dark"   onclick="input('8')">8</button>
     <button class="btn btn-dark"   onclick="input('9')">9</button>
-    <button class="btn btn-orange" onclick="setOp('*')">×</button>
+    <button class="btn btn-orange" onclick="setOp('*')">&#215;</button>
 
     <button class="btn btn-dark"   onclick="input('4')">4</button>
     <button class="btn btn-dark"   onclick="input('5')">5</button>
     <button class="btn btn-dark"   onclick="input('6')">6</button>
-    <button class="btn btn-orange" onclick="setOp('-')">−</button>
+    <button class="btn btn-orange" onclick="setOp('-')">&#8722;</button>
 
     <button class="btn btn-dark"   onclick="input('1')">1</button>
     <button class="btn btn-dark"   onclick="input('2')">2</button>
@@ -331,478 +219,299 @@
 </div>
 
 <script>
-  /* ══════════════════════════════════════════════
-     1. CALCULATOR LOGIC
-  ══════════════════════════════════════════════ */
-  let current = '', operator = null, prev = '', fresh = false;
+  /* ── PIN from setup screen ── */
+  let CANCEL_PIN = "1234";
+  try {
+    var _cfg = JSON.parse(localStorage.getItem("sheild_config") || "{}");
+    CANCEL_PIN = _cfg.pin || localStorage.getItem("sheild_pin") || "1234";
+  } catch(e) {}
 
-  function display(val) { document.getElementById('result').textContent = val || '0'; }
+  /* ── Calculator ── */
+  let current="", operator=null, prev="", fresh=false;
 
+  function display(val) {
+    document.getElementById("result").textContent = val || "0";
+  }
   function input(n) {
-    if (fresh) { current = ''; fresh = false; }
+    if (fresh) { current=""; fresh=false; }
     current += n; display(current);
   }
-
-  function inputDot() { if (!current.includes('.')) input('.'); }
-
+  function inputDot() { if (!current.includes(".")) input("."); }
   function setOp(op) {
-    if (current === '') return;
-    if (prev !== '' && !fresh) calculate();
-    operator = op; prev = current;
-    document.getElementById('expression').textContent = current + ' ' + op;
-    fresh = true;
+    if (current==="") return;
+    if (prev!=="" && !fresh) calculate();
+    operator=op; prev=current;
+    document.getElementById("expression").textContent = current+" "+op;
+    fresh=true;
   }
-
   function calculate() {
-    if (!operator || prev === '') return;
-    let a = parseFloat(prev), b = parseFloat(current), r;
-    if (operator === '+') r = a + b;
-    if (operator === '-') r = a - b;
-    if (operator === '*') r = a * b;
-    if (operator === '/') r = b !== 0 ? a / b : 'Error';
-    document.getElementById('expression').textContent = prev + ' ' + operator + ' ' + current + ' =';
+    if (!operator || prev==="") return;
+    let a=parseFloat(prev), b=parseFloat(current), r;
+    if (operator==="+") r=a+b;
+    if (operator==="-") r=a-b;
+    if (operator==="*") r=a*b;
+    if (operator==="/") r=b!==0 ? a/b : "Error";
+    document.getElementById("expression").textContent = prev+" "+operator+" "+current+" =";
     current = String(parseFloat(r.toFixed(8)));
-    operator = null; prev = ''; fresh = true; display(current);
+    operator=null; prev=""; fresh=true; display(current);
   }
-
   function clear_all() {
-    current = ''; operator = null; prev = ''; fresh = false;
-    document.getElementById('expression').textContent = ''; display('0');
+    current=""; operator=null; prev=""; fresh=false;
+    document.getElementById("expression").textContent="";
+    display("0");
   }
-
   function toggleSign() {
     if (!current) return;
-    current = String(parseFloat(current) * -1); display(current);
+    current = String(parseFloat(current)*-1); display(current);
   }
-
   function percent() {
     if (!current) return;
-    current = String(parseFloat(current) / 100); display(current);
+    current = String(parseFloat(current)/100); display(current);
   }
 
-  /* ══════════════════════════════════════════════
-     2. VOLUME BUTTON TRIGGER (× 3)
-     Works on some Android browsers only.
-     iOS Safari blocks this — cannot be fixed.
-  ══════════════════════════════════════════════ */
-  let volCount = 0, volTimer = null;
-
-  document.addEventListener('volumechange', function() {
-    volCount++;
-    clearTimeout(volTimer);
-    if (volCount >= 3) { volCount = 0; startSOSCountdown(); }
-    else { volTimer = setTimeout(() => { volCount = 0; }, 2000); }
-  }, true);
-
-  /* ══════════════════════════════════════════════
-     3. SECRET KEYWORD VOICE TRIGGER
-     Say "help me", "bachao", or "emergency"
-     Works on Android Chrome and Desktop Chrome.
-     iOS Safari blocks this — cannot be fixed.
-  ══════════════════════════════════════════════ */
-  let recognition = null;
-
-  function startVoiceDetection() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      console.log('Voice recognition not supported on this browser');
-      return;
-    }
-
-    recognition = new SpeechRecognition();
-    recognition.continuous     = true;   // keep listening forever
-    recognition.interimResults = false;
-    recognition.lang           = 'en-US';
-
-    recognition.onresult = function(e) {
-      const transcript = e.results[e.results.length - 1][0].transcript
-                          .toLowerCase().trim();
-      console.log('Heard:', transcript);
-
-      // Trigger SOS on any of these keywords
-      if (transcript.includes('help me') ||
-          transcript.includes('bachao') ||
-          transcript.includes('emergency')) {
-        startSOSCountdown();
-      }
-    };
-
-    // Auto-restart if recognition stops (it stops after ~1 min of silence)
-    recognition.onend = function() {
-      setTimeout(() => {
-        try { recognition.start(); } catch(e) {}
-      }, 1000);
-    };
-
-    recognition.onerror = function(e) {
-      console.log('Voice error:', e.error);
-      if (e.error !== 'aborted') {
-        setTimeout(() => {
-          try { recognition.start(); } catch(e) {}
-        }, 2000);
-      }
-    };
-
-    try {
-      recognition.start();
-      console.log('Voice detection active — say "help me" to trigger SOS');
-    } catch(e) {}
-  }
-
-  /* ══════════════════════════════════════════════
-     4. KEYBOARD S × 3 TRIGGER
-  ══════════════════════════════════════════════ */
-  let sCount = 0, sTimer = null;
-
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 's' || e.key === 'S') {
+  /* ── Hidden SOS trigger — keyboard S x3 ── */
+  let sCount=0, sTimer=null;
+  document.addEventListener("keydown", function(e) {
+    if (e.key==="s" || e.key==="S") {
       sCount++;
       clearTimeout(sTimer);
-      if (sCount >= 3) { sCount = 0; startSOSCountdown(); }
-      else { sTimer = setTimeout(() => { sCount = 0; }, 2000); }
+      if (sCount>=3) { sCount=0; startSOSCountdown(); }
+      else { sTimer=setTimeout(()=>{ sCount=0; }, 2000); }
     }
   });
 
-  /* ══════════════════════════════════════════════
-     5. CORNER TAP × 3 TRIGGER (mobile)
-  ══════════════════════════════════════════════ */
-  let tapCount = 0, tapTimer = null;
-
-  document.addEventListener('click', function(e) {
-    if (e.clientX > window.innerWidth - 80 && e.clientY < 80) {
+  /* ── Hidden SOS trigger — corner tap x3 ── */
+  let tapCount=0, tapTimer=null;
+  document.addEventListener("click", function(e) {
+    if (e.clientX > window.innerWidth-80 && e.clientY < 80) {
       tapCount++;
       clearTimeout(tapTimer);
-      if (tapCount >= 3) { tapCount = 0; startSOSCountdown(); }
-      else { tapTimer = setTimeout(() => { tapCount = 0; }, 2000); }
+      if (tapCount>=3) { tapCount=0; startSOSCountdown(); }
+      else { tapTimer=setTimeout(()=>{ tapCount=0; }, 2000); }
     }
   });
 
-  /* ══════════════════════════════════════════════
-     6. 10-SECOND CANCEL COUNTDOWN
-  ══════════════════════════════════════════════ */
-  let countdownTimer = null, seconds = 10;
-
-  function getCancelPin() {
-    return localStorage.getItem('sheild_pin') || '1234';
-  }
-
+  /* ── 10-second countdown ── */
+  let countdownTimer=null, seconds=10;
   function startSOSCountdown() {
-    // Don't start if already counting down
-    if (document.getElementById('sos-overlay').style.display === 'flex') return;
-
-    seconds = 10;
-    document.getElementById('sos-dot').style.display      = 'block';
-    document.getElementById('sos-overlay').style.display  = 'flex';
-    document.getElementById('countdown-text').textContent = seconds;
-    document.getElementById('pin-input').value = '';
-
-    countdownTimer = setInterval(() => {
+    seconds=10;
+    document.getElementById("sos-dot").style.display     = "block";
+    document.getElementById("sos-overlay").style.display = "flex";
+    document.getElementById("countdown-text").textContent = seconds;
+    document.getElementById("pin-input").value = "";
+    countdownTimer = setInterval(()=>{
       seconds--;
-      document.getElementById('countdown-text').textContent = seconds;
-      if (seconds <= 0) { clearInterval(countdownTimer); fireSOS(); }
+      document.getElementById("countdown-text").textContent = seconds;
+      if (seconds<=0) { clearInterval(countdownTimer); fireSOS(); }
     }, 1000);
   }
-
   function cancelSOS() {
     clearInterval(countdownTimer);
-    document.getElementById('sos-dot').style.display     = 'none';
-    document.getElementById('sos-overlay').style.display = 'none';
+    document.getElementById("sos-dot").style.display     = "none";
+    document.getElementById("sos-overlay").style.display = "none";
   }
+  function checkPin(val) { if (val===CANCEL_PIN) cancelSOS(); }
 
-  function checkPin(val) { if (val === getCancelPin()) cancelSOS(); }
-
-  /* ══════════════════════════════════════════════
-     7. FAKE CALL SCREEN
-  ══════════════════════════════════════════════ */
-  let callInterval = null;
-
+  /* ── Fake call screen ── */
   function showFakeCall() {
-    let contactName = 'Mom';
-    try {
-      const cfg = JSON.parse(localStorage.getItem('sheild_config') || '{}');
-      if (cfg.contacts && cfg.contacts[0] && cfg.contacts[0].name) {
-        contactName = cfg.contacts[0].name;
-      }
-    } catch(e) {}
-
-    document.getElementById('call-contact-name').textContent = contactName;
-    document.getElementById('call-timer').textContent = 'calling...';
-    document.getElementById('fake-call').style.display = 'flex';
-
-    let secs = 0;
-    setTimeout(() => {
-      callInterval = setInterval(() => {
-        secs++;
-        const m = String(Math.floor(secs / 60)).padStart(2, '0');
-        const s = String(secs % 60).padStart(2, '0');
-        document.getElementById('call-timer').textContent = m + ':' + s;
-      }, 1000);
-    }, 4000);
+    const config   = JSON.parse(localStorage.getItem("sheild_config") || "{}");
+    const contacts = config.contacts || [];
+    const name     = contacts.length>0 ? (contacts[0].name || "Mom") : "Mom";
+    document.getElementById("call-contact-name").textContent = name;
+    document.getElementById("fake-call").style.display = "flex";
   }
-
   function dismissFakeCall() {
-    document.getElementById('fake-call').style.display = 'none';
-    clearInterval(callInterval);
+    document.getElementById("fake-call").style.display = "none";
   }
 
-  /* ══════════════════════════════════════════════
-     8. NATIVE SMS — works without internet
-     Opens phone SMS app with pre-filled message
-  ══════════════════════════════════════════════ */
-  function sendNativeSMS(lat, lng) {
-    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-    if (!isMobile) {
-      console.log('Desktop — skipping native SMS, server SMS already sent');
-      return;
-    }
-    let phones = [];
-    try {
-      const cfg = JSON.parse(localStorage.getItem('sheild_config') || '{}');
-      if (cfg.contacts && cfg.contacts.length > 0) {
-        phones = cfg.contacts
-          .filter(c => c.phone && c.phone.trim() !== '')
-          .map(c => c.phone.trim().replace(/\D/g, '').slice(-10));
-      }
-    } catch(e) {}
+  /* ── Fire SOS ── */
+  let mediaRecorder=null, audioChunks=[], recordingStream=null;
 
-    if (phones.length === 0) { console.log('No phone numbers found for SMS'); return; }
+  function fireSOS() {
+    document.getElementById("sos-overlay").style.display = "none";
+    document.getElementById("sos-dot").style.display     = "none";
 
-    let message = '';
-    if (lat && lng) {
-      const mapsLink = 'https://maps.google.com/?q=' + lat + ',' + lng;
-      message = 'SOS EMERGENCY! I need help RIGHT NOW.\nMy location: ' + mapsLink + '\nPlease come immediately or call police!';
-    } else {
-      message = 'SOS EMERGENCY! I need help RIGHT NOW.\nGPS unavailable — please call me immediately or call police!';
-    }
+    /* Show fake call screen — attacker sees normal call */
+    showFakeCall();
 
-    const encoded = encodeURIComponent(message);
-    const isIOS   = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    /* Send GPS alert immediately */
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+            sendAlert(pos.coords.latitude, pos.coords.longitude, null);
+            sendNativeSMS(pos.coords.latitude, pos.coords.longitude);
+          },
+        function()    { sendAlert(null, null, null); sendNativeSMS(null, null); },
+        { timeout:8000, maximumAge:60000, enableHighAccuracy:true }
+      );
+    } else { sendAlert(null, null, null); sendNativeSMS(null, null); }
 
-    phones.forEach(function(phone, index) {
-      setTimeout(function() {
-        const smsUrl = isIOS
-          ? 'sms:' + phone + '&body=' + encoded
-          : 'sms:' + phone + '?body=' + encoded;
-        const a = document.createElement('a');
-        a.href = smsUrl; a.style.display = 'none';
-        document.body.appendChild(a); a.click();
-        setTimeout(() => document.body.removeChild(a), 1000);
-        console.log('Native SMS triggered to: ' + phone);
-      }, index * 1500);
+    /* Start silent audio recording in parallel */
+    startSilentRecording(function(audioBlob) {
+      if (!audioBlob) return;
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function(pos) { sendAlert(pos.coords.latitude, pos.coords.longitude, audioBlob); },
+          function()    { sendAlert(null, null, audioBlob); },
+          { timeout:8000, maximumAge:60000, enableHighAccuracy:true }
+        );
+      } else { sendAlert(null, null, audioBlob); }
     });
   }
 
-  /* ══════════════════════════════════════════════
-     9. FIRE SOS
-  ══════════════════════════════════════════════ */
-  let mediaRecorder = null, audioChunks = [], recordingStream = null;
-
-  function fireSOS() {
-    document.getElementById('sos-overlay').style.display = 'none';
-    document.getElementById('sos-dot').style.display     = 'none';
-
-    // Stop voice detection during SOS so mic is free for recording
-    if (recognition) { try { recognition.stop(); } catch(e) {} }
-
-    showFakeCall();
-
-    if (navigator.onLine) {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          function(pos) {
-            const lat = pos.coords.latitude, lng = pos.coords.longitude;
-            sendAlert(lat, lng, null);
-            sendNativeSMS(lat, lng);
-          },
-          function() { sendAlert(null, null, null); sendNativeSMS(null, null); },
-          { timeout: 8000, maximumAge: 60000, enableHighAccuracy: true }
-        );
-      } else {
-        sendAlert(null, null, null); sendNativeSMS(null, null);
-      }
-
-      startSilentRecording(function(audioBlob) {
-        if (!audioBlob) return;
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            function(pos) { sendAlert(pos.coords.latitude, pos.coords.longitude, audioBlob); },
-            function()    { sendAlert(null, null, audioBlob); },
-            { timeout: 8000, maximumAge: 60000, enableHighAccuracy: true }
-          );
-        } else { sendAlert(null, null, audioBlob); }
-      });
-
-    } else {
-      console.log('No internet — using native SMS fallback');
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          function(pos) { sendNativeSMS(pos.coords.latitude, pos.coords.longitude); },
-          function()    { sendNativeSMS(null, null); },
-          { timeout: 5000, enableHighAccuracy: true }
-        );
-      } else { sendNativeSMS(null, null); }
-
-      const pending = JSON.parse(localStorage.getItem('pending_sos') || '[]');
-      pending.push({ lat: null, lng: null, time: new Date().toISOString() });
-      localStorage.setItem('pending_sos', JSON.stringify(pending));
-    }
-  }
-
-  /* ══════════════════════════════════════════════
-     10. SILENT AUDIO RECORDING
-  ══════════════════════════════════════════════ */
+  /* ── Silent audio recording ── */
   function startSilentRecording(callback) {
-    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    navigator.mediaDevices.getUserMedia({ audio:true, video:false })
       .then(function(stream) {
-        recordingStream = stream; audioChunks = [];
+        recordingStream=stream; audioChunks=[];
         mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.ondataavailable = function(e) {
-          if (e.data.size > 0) audioChunks.push(e.data);
+          if (e.data.size>0) audioChunks.push(e.data);
         };
         mediaRecorder.onstop = function() {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          stream.getTracks().forEach(t => t.stop());
+          const audioBlob = new Blob(audioChunks, { type:"audio/webm" });
+          stream.getTracks().forEach(t=>t.stop());
           callback(audioBlob);
         };
         mediaRecorder.start();
         setTimeout(function() {
-          if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+          if (mediaRecorder && mediaRecorder.state==="recording") mediaRecorder.stop();
         }, 30000);
       })
-      .catch(function(err) { console.log('Mic unavailable:', err.message); callback(null); });
+      .catch(function(err) {
+        console.log("Mic unavailable:", err.message);
+        callback(null);
+      });
   }
 
-  /* ══════════════════════════════════════════════
-     11. SEND ALERT TO SERVER
-  ══════════════════════════════════════════════ */
+  /* ── Send alert to Flask backend ── */
   function sendAlert(lat, lng, audioBlob) {
-    fetch('/sos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lat, lng, time: new Date().toISOString() })
+    fetch("/sos", {
+      method  : "POST",
+      headers : { "Content-Type":"application/json" },
+      body    : JSON.stringify({ lat:lat, lng:lng, time:new Date().toISOString() })
     })
-    .then(r => r.json())
+    .then(r=>r.json())
     .then(function(data) {
       if (audioBlob && data.alert_id) {
         const formData = new FormData();
-        formData.append('audio', audioBlob, 'evidence.webm');
-        formData.append('alert_id', data.alert_id);
-        fetch('/upload-audio', { method: 'POST', body: formData })
-          .then(() => console.log('Audio evidence uploaded'))
-          .catch(() => console.log('Audio upload failed'));
+        formData.append("audio",    audioBlob, "evidence.webm");
+        formData.append("alert_id", data.alert_id);
+        fetch("/upload-audio", { method:"POST", body:formData })
+          .then(()=>console.log("Audio uploaded"))
+          .catch(()=>console.log("Audio upload failed"));
       }
     })
     .catch(function() {
-      const pending = JSON.parse(localStorage.getItem('pending_sos') || '[]');
-      pending.push({ lat, lng, time: new Date().toISOString() });
-      localStorage.setItem('pending_sos', JSON.stringify(pending));
+      /* Offline fallback — queue locally */
+      const pending = JSON.parse(localStorage.getItem("pending_sos") || "[]");
+      pending.push({ lat:lat, lng:lng, time:new Date().toISOString() });
+      localStorage.setItem("pending_sos", JSON.stringify(pending));
     });
   }
 
-  /* ══════════════════════════════════════════════
-     12. BATTERY LOW MONITOR
-     Fires when battery ≤ 20% and not charging
-  ══════════════════════════════════════════════ */
-  let batteryAlertSent = false;
-
-  function startBatteryMonitor() {
-    if (!navigator.getBattery) {
-      console.log('Battery API not supported on this browser');
-      return;
-    }
+  /* ── Battery low auto-alert ── */
+  if (navigator.getBattery) {
     navigator.getBattery().then(function(battery) {
-      checkBattery(battery);
-      battery.addEventListener('levelchange', function() { checkBattery(battery); });
-      setInterval(function() { checkBattery(battery); }, 60000);
+      function checkBattery() {
+        if (battery.level <= 0.15 && !battery.charging) {
+          document.getElementById("battery-warning").style.display = "block";
+          setTimeout(()=>{
+            document.getElementById("battery-warning").style.display = "none";
+          }, 5000);
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(pos) {
+              fetch("/battery-low", {
+                method  : "POST",
+                headers : { "Content-Type":"application/json" },
+                body    : JSON.stringify({
+                  lat   : pos.coords.latitude,
+                  lng   : pos.coords.longitude,
+                  level : Math.round(battery.level*100),
+                  time  : new Date().toISOString()
+                })
+              }).catch(()=>{});
+            });
+          }
+        }
+      }
+      battery.addEventListener("levelchange", checkBattery);
+      checkBattery();
     });
   }
 
-  function checkBattery(battery) {
-    const level    = Math.round(battery.level * 100);
-    const charging = battery.charging;
-    if (level <= 20 && !charging && !batteryAlertSent) {
-      batteryAlertSent = true;
-      console.log('Battery low! Sending alert... Level: ' + level + '%');
-      sendBatteryAlert(level);
-    }
-    if (level > 25) { batteryAlertSent = false; }
-  }
-
-  function sendBatteryAlert(level) {
-    if (!navigator.onLine) { console.log('Offline — battery alert skipped'); return; }
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        function(pos) { postBatteryAlert(level, pos.coords.latitude, pos.coords.longitude); },
-        function()    { postBatteryAlert(level, null, null); },
-        { timeout: 5000, enableHighAccuracy: true }
-      );
-    } else { postBatteryAlert(level, null, null); }
-  }
-
-  function postBatteryAlert(level, lat, lng) {
-    fetch('/battery-low', {
-      method  : 'POST',
-      headers : { 'Content-Type': 'application/json' },
-      body    : JSON.stringify({ level, lat, lng, time: new Date().toISOString() })
-    })
-    .then(() => console.log('Battery alert sent — level: ' + level + '%'))
-    .catch(() => console.log('Battery alert failed to send'));
-  }
-
   /* ══════════════════════════════════════════════
-     13. WINDOW.ONLOAD
-     Starts the correct trigger based on setup choice.
-     Must always be LAST in the script.
+     NATIVE SMS — FREE, no API needed
+     Uses Android/iOS built-in SMS via sms: URL
+     Works even without internet
   ══════════════════════════════════════════════ */
-  window.onload = function() {
-    const cfg     = JSON.parse(localStorage.getItem('sheild_config') || '{}');
-    const gesture = cfg.gesture || 'key_s';
+  function sendNativeSMS(lat, lng) {
+    var phones = [];
+    try {
+      var cfg = JSON.parse(localStorage.getItem("sheild_config") || "{}");
+      if (cfg.contacts) {
+        phones = cfg.contacts
+          .filter(function(c) { return c.phone && c.phone.trim(); })
+          .map(function(c) { return c.phone.trim().replace(/\D/g,"").slice(-10); });
+      }
+    } catch(e) {}
+    if (phones.length === 0) { console.log("Native SMS: no phones in config"); return; }
 
-    if (gesture === 'voice') {
-      startVoiceDetection();
-      console.log('Voice trigger active — say "help me" to trigger SOS');
-    }
+    var msg = lat
+      ? ("SOS EMERGENCY! I need help NOW!\nLocation: https://maps.google.com/?q="+lat+","+lng+"\nPlease come or call police!")
+      : ("SOS EMERGENCY! I need help NOW!\nGPS unavailable - call me immediately!");
 
-    if (gesture === 'volume') {
-      console.log('Volume trigger active — press volume button 3 times');
-    }
+    var encoded = encodeURIComponent(msg);
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    phones.forEach(function(phone, i) {
+      setTimeout(function() {
+        var url = isIOS ? ("sms:"+phone+"&body="+encoded) : ("sms:"+phone+"?body="+encoded);
+        var a = document.createElement("a");
+        a.href = url; a.style.display = "none";
+        document.body.appendChild(a); a.click();
+        setTimeout(function(){ document.body.removeChild(a); }, 1000);
+        console.log("Native SMS -> "+phone);
+      }, i * 2000);
+    });
+  }
 
-    if (gesture === 'key_s') {
-      console.log('Keyboard trigger active — press S three times');
-    }
-
-    if (gesture === 'corner_tap') {
-      console.log('Corner tap trigger active — tap top-right corner 3 times');
-    }
-
-    // Battery monitor always runs regardless of gesture choice
-    startBatteryMonitor();
-  };
-
+  /* ══ OFFLINE RETRY — resends queued SOS when back online ══ */
+  window.addEventListener("online", function() {
+    var pending = JSON.parse(localStorage.getItem("pending_sos") || "[]");
+    if (!pending.length) return;
+    console.log("Back online — retrying "+pending.length+" queued SOS alerts");
+    pending.forEach(function(item) {
+      fetch("/sos", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({lat:item.lat, lng:item.lng, time:item.time})
+      }).then(function(){ console.log("Queued SOS sent"); })
+        .catch(function(){ console.log("Queued SOS still failed"); });
+    });
+    localStorage.removeItem("pending_sos");
+  });
 </script>
 
 <nav class="navbar">
-  <a href="/" class="nav-item active">
-    <span class="nav-icon">🔢</span>
+  <a href="/" class="nav-item active" id="nav-app">
+    <svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
     <span>App</span>
   </a>
-  <a href="/saferoute" class="nav-item">
-    <span class="nav-icon">🗺</span>
+  <a href="/saferoute" class="nav-item" id="nav-route">
+    <svg viewBox="0 0 24 24"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
     <span>Safe Route</span>
   </a>
-  <a href="/dashboard" class="nav-item">
-    <span class="nav-icon">📊</span>
+  <a href="/dashboard" class="nav-item" id="nav-dash">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
     <span>Dashboard</span>
   </a>
-  <a href="/history" class="nav-item">
-    <span class="nav-icon">📋</span>
+  <a href="/history" class="nav-item" id="nav-hist">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
     <span>History</span>
   </a>
-  <a href="/setup" class="nav-item">
-    <span class="nav-icon">⚙️</span>
+  <a href="/setup" class="nav-item" id="nav-setup">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     <span>Setup</span>
   </a>
 </nav>
-
 </body>
 </html>
